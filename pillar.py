@@ -74,6 +74,7 @@ class MainApplication(QMainWindow):
         self.create_file_list_order_labels()
         self.create_bottom_bar()
         self.create_top_bar()
+        self.create_pages()
 
     def create_app_container(self):
         self.setContentsMargins(0, 0, 0, 0)
@@ -88,13 +89,28 @@ class MainApplication(QMainWindow):
         self.main_layout.addLayout(self.body_layout)        
         self.setCentralWidget(central_widget)
        
+
+    def create_pages(self):
+        self.stacked_widget = QStackedWidget()
+        self.home_page = self.content_area
+        self.about_page = AboutPage()
+        self.settings_page = SettingsPage()
+        
+        self.stacked_widget.addWidget(self.home_page)
+        self.stacked_widget.addWidget(self.about_page)
+        self.stacked_widget.addWidget(self.settings_page)
+
     def setup_layout(self):
         self.content_area.content_area.addWidget(self.topbar)
         self.content_area.content_area.addWidget(self.file_list)
         self.content_area.content_area.addWidget(self.bottom_bar)
         self.body_layout.addWidget(self.sidebar)
-        self.body_layout.addWidget(self.content_area, 1)
-       
+        self.body_layout.addWidget(self.stacked_widget, 1)
+
+    def switch_page(self, index):
+        self.stacked_widget.setCurrentIndex(index)
+        self.sidebar.update_button_styles(index)
+
     def bind_events(self):
         # Event binding code here
         pass
@@ -120,7 +136,7 @@ class MainApplication(QMainWindow):
 
     # Sidebar related methods
     def create_sidebar(self):       
-        self.sidebar = Sidebar()
+        self.sidebar = Sidebar(self)
     # Content area related methods
     def create_content_area(self):       
         self.content_area = ContentArea()
@@ -251,7 +267,7 @@ class MainApplication(QMainWindow):
                 speed="---"
             )
         self.file_widgets[filename] = file_item 
-        self.file_list.file_layout.addWidget(file_item)
+        self.file_list.file_layout.insertWidget(0, file_item)
        
     
     def display_all_downloads_on_page(self):
@@ -455,9 +471,7 @@ class ContentArea(QFrame):
     def __init__(self):
         super().__init__()
         
-        self.create_widgets()
-
-        
+        self.create_widgets()        
     
     def create_widgets(self):
         self.content_area = QVBoxLayout()
@@ -470,39 +484,68 @@ class ContentArea(QFrame):
         
 
 class Sidebar(QFrame):
-    def __init__(self):
+    def __init__(self, app):
         super().__init__()    
+        self.main_app = app
+        self.buttons = []
         self.create_widgets()
 
-    def add_icon_button(self, layout, icon_path, text):
-        btn = QPushButton(QIcon(icon_path), "")
+        self.setStyleSheet("""
+            #sidebar {
+                background-color: #e2e7eb;
+            }
+            QPushButton {
+                border-radius: 10px;
+                margin: 0;
+                width: 40px;
+                height: 40px;
+                margin-bottom: 10px;
+            }
+        """)
+
+    def add_icon_button(self, layout, icon_paths, text, index):
+        btn = QPushButton(QIcon(icon_paths['outline']), "")
         btn.setObjectName(f'{text}-btn')
+        btn.clicked.connect(lambda: self.main_app.switch_page(index))
         layout.addWidget(btn)
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self.buttons.append((btn, icon_paths))
+        return btn
 
     def create_widgets(self):       
         sidebar = QVBoxLayout()
-        sidebar.setSpacing(0)  # Ensure no extra spacing between buttons
-        sidebar.setContentsMargins(5, 5, 5, 5)  # Ensure no margins around the layout
-        self.add_icon_button(sidebar, "images/home-filled.png", "Home")
-        self.add_icon_button(sidebar, "images/about-outline.png", "About")
-        self.add_icon_button(sidebar, "images/settings-outline.png", "Settings")
+        sidebar.setSpacing(0)
+        sidebar.setContentsMargins(5, 5, 5, 5)
+        self.add_icon_button(sidebar, {"outline": "images/home-outline.png", "filled": "images/home-filled.png"}, "Home", 0)
+        self.add_icon_button(sidebar, {"outline": "images/about-outline.png", "filled": "images/about-filled.png"}, "About", 1)
+        self.add_icon_button(sidebar, {"outline": "images/settings-outline.png", "filled": "images/settings-filled.png"}, "Settings", 2)
         self.setLayout(sidebar)
         self.setObjectName('sidebar')
-        self.setFixedWidth(50)  # Sidebar width
+        self.setFixedWidth(50)
+        self.update_button_styles(0)  # Set initial active button
 
-    def bind_events(self):
-        pass
-    def clear_styles_for_widgets(self):
-        pass
-
-    ## pages lauching
-    def open_home_page(self):
-        pass
-   
-    def open_about_page(self):
-        pass
-    
+    def update_button_styles(self, active_index):
+        for i, (btn, icon_paths) in enumerate(self.buttons):
+            if i == active_index:
+                btn.setIcon(QIcon(icon_paths['filled']))
+                btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: white;
+                    }
+                """)
+            else:
+                btn.setIcon(QIcon(icon_paths['outline']))
+                btn.setStyleSheet(f"""
+                    QPushButton {{
+                        background-color: #e2e7eb;
+                    }}
+                    QPushButton:hover {{
+                        background-color: white;
+                    }}
+                    QPushButton:hover {{
+                        icon: url('{icon_paths['filled']}');
+                    }}
+                """)
         
 class FileList(QScrollArea):
     def __init__(self):
@@ -897,7 +940,29 @@ class CustomTitleBar(QFrame):
 
 
 
+class AboutPage(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setup_ui()
 
+    def setup_ui(self):
+        layout = QVBoxLayout()
+        label = QLabel("About Page")
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(label)
+        self.setLayout(layout)
+
+class SettingsPage(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setup_ui()
+
+    def setup_ui(self):
+        layout = QVBoxLayout()
+        label = QLabel("Settings Page")
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(label)
+        self.setLayout(layout)
 
 
 

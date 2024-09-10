@@ -320,30 +320,7 @@ class OtherMethods():
                 margin: 0px 5px 5px 0;
                 
             }
-            #About-btn, #Home-btn, #Settings-btn{
-                background-color: #e2e7eb;
-                border-radius: 10px;
-                margin: 0;
-                width: 40px;
-                height: 40px;
-                margin-bottom: 10px;
-               
-            } 
-            #Home-btn{
-                background-color: white;
-            } 
-           
-            #About-btn:hover{
-                background-color: white;
-                icon: url('images/about-filled.png');
-            }
-            #Settings-btn:hover{
-                background-color: white;
-                icon: url('images/settings-filled.png');
-            }#Home-btn:hover{
-                background-color: white;
-                icon: url('images/home-filled.png');
-            }
+            
             #active-btn, #downloaded-btn{
                 background-color: #e2e7eb;
                 width: 110px;
