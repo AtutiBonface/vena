@@ -29,7 +29,8 @@ class MainApplication(QMainWindow):
         
 
     def setup_window(self):
-        self.setWindowTitle('Blackjuice')
+        self.setWindowTitle('VenaApp')
+        self.setWindowIcon(QIcon('images/main.ico'))
         self.setGeometry(100, 100, 800, 540)
         self.center_window()
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
@@ -191,34 +192,30 @@ class MainApplication(QMainWindow):
     def load_downloads_from_db(self):
         all_downloads = storage.get_all_data()
         for download in all_downloads:
-            id, filename, address, filesize, downloaded, status, modification_date, path = download
+            id, filename, address, filesize, downloaded, status, percentage,modification_date, path = download
             self.xengine_downloads[filename] = {
                 'url': address,
                 'status': status,
                 'downloaded': downloaded,
                 'filesize': filesize,
                 'modification_date': modification_date,
-                'path': path
+                'path': path,
+                'percentage': percentage
             }
 
     # File management methods
     def add_download_to_list(self, filename, address, path, date):        
         self.xengine_downloads[filename] = {
             'url': address,
-            'status': 'waiting...',
+            'status': 'Waiting..',
             'downloaded': '---',
             'filesize': '---',
             'modification_date': date,
             'path': path
         }
-        self.update_queue.put((filename, 'waiting...', '---','---', date))
-        
+        self.update_queue.put((filename, 'Waiting..', '---','---','---','---', date))
     
-
-       
-     
-
-    def update_download(self, filename, status, size, downloaded ,date, speed):
+    def update_download(self, filename, status, size, downloaded ,date, speed, percentage):
         size = str(size)
         downloaded = str(downloaded)
         name = os.path.basename(filename)
@@ -226,20 +223,20 @@ class MainApplication(QMainWindow):
         if name in self.xengine_downloads:
             updateDict = self.xengine_downloads[name]           
             if 'failed' in status.lower():  # Convert status to lowercase for case-insensitive comparison
-                updateDict['status'] = 'failed!'
+                updateDict['status'] = 'Failed!'
             else:
                 updateDict['status'] = status
             updateDict['filesize'] = size
             updateDict['modification_date'] = date
             updateDict['downloaded'] = downloaded
-            self.update_queue.put((name, updateDict['status'], size, downloaded ,date))
+            if not percentage == '---'  or not  percentage.strip() == '':
+                updateDict['percentage'] = percentage
 
-         
-    # UI update methods
+            self.update_queue.put((name, updateDict['status'], size, downloaded,speed,percentage,date))
 
-    def update_file_widget(self, filename, status, size, downloaded ,date):        
+    def update_file_widget(self, filename, status, size, downloaded,speed, percentage ,date):        
         if filename in self.file_widgets:
-            self.file_widgets[filename].update_widget(filename, status,size, downloaded, date, '---', '---')
+            self.file_widgets[filename].update_widget(filename, status,size, downloaded, date, speed, percentage)
         else:
             self.add_new_file_widget(filename, status, size, date)
 
@@ -265,8 +262,8 @@ class MainApplication(QMainWindow):
                 downloaded=f"{detail['downloaded']}",
                 modified_date=f"{detail['modification_date']}",
                 status=detail['status'],
-                percentage= f"10%",
-                speed="1.25mbs"
+                percentage= detail['percentage'],
+                speed=" "
             )           
             self.file_list.file_layout.addWidget(file_item)
            
@@ -526,7 +523,7 @@ class FileList(QScrollArea):
         
 
 class FileItemWidget(QFrame):
-    def __init__(self, filename, file_size, downloaded,status, percentage,speed,modified_date):
+    def __init__(self, filename, file_size, downloaded,status, percentage, speed,modified_date):
         super().__init__()
         other_methods = OtherMethods()       
         file_size = other_methods.return_filesize_in_correct_units(file_size)
@@ -566,7 +563,7 @@ class FileItemWidget(QFrame):
         details_layout.addWidget(self.download_info)
         details_layout.addWidget(self.download_speed) 
 
-        if 'failed' in status:
+        if 'failed' in status.lower():
             details_layout.addWidget(self.download_failed)       
         self.modified_label = QLabel(modified_date)
         self.modified_label.setObjectName('modified_date')
@@ -577,10 +574,10 @@ class FileItemWidget(QFrame):
         
         main_layout.addLayout(text_layout)
 
-        self.apply_font(self.filename_label, 'Arial', 10, False, True)
+        self.apply_font(self.filename_label, 'Lato', 10)
         self.apply_font(self.download_status, 'Arial', 10)
         self.apply_font(self.download_info, 'Arial', 9)
-        self.apply_font(self.download_speed, 'Arial', 10)
+        self.apply_font(self.download_speed, 'Exo 2', 10)
         self.apply_font(self.download_failed, 'Arial', 9, underline=True, italic=True)
         
         self.setLayout(main_layout)
@@ -598,13 +595,16 @@ class FileItemWidget(QFrame):
                 background-color: transparent;
             }
             #status{               
-                max-width: 100px;
+                max-width: 150px;
+                color: grey;
             }
             #info{                
                 max-width: 150px;
+                color: grey;
             }
             #speed{               
                 max-width: 70px;
+                color: grey;
             }
             #retry{
                 max-width: 60px;
@@ -627,13 +627,16 @@ class FileItemWidget(QFrame):
                 max-width: 40px;
             }
             #status{               
-                max-width: 100px;
+                max-width: 150px;
+                color: grey;
             }
             #info{                
                 max-width: 150px;
+                color: grey;
             }
             #speed{               
                 max-width: 70px;
+                color: grey;
             }
             #retry{
                 max-width: 60px;
@@ -656,15 +659,15 @@ class FileItemWidget(QFrame):
                 max-width: 40px;
             }
             #status{
-               
-                max-width: 100px;
+                color: grey;
+                max-width: 150px;
             }
             #info{
-                
+                color: grey;
                 max-width: 150px;
             }
             #speed{
-               
+                color: grey;
                 max-width: 70px;
             }
             #retry{
@@ -693,9 +696,18 @@ class FileItemWidget(QFrame):
         # Update file size and downloaded information
         self.download_info.setText(f"[ {downloaded} / {file_size} ]")
         # Update download status
-        self.download_status.setText(f"{status}")
+        if 'finished' in status.lower():
+            self.download_status.setText(f"{status} ")
+        elif 'failed' in status.lower():
+            self.download_status.setText(f"Failed!")
+        else:
+            self.download_status.setText(f"{status} {percentage}")
+
         # Update download speed
-        self.download_speed.setText(f"{speed}")
+        if not speed == '0':
+            self.download_speed.setText(f"{speed}")
+        else:
+            self.download_speed.setText(f"")
         # Update modified date
         self.modified_label.setText(modified_date)
 
@@ -710,15 +722,15 @@ class FileItemWidget(QFrame):
                 max-width: 40px;
             }
             #status{
-               
-                max-width: 100px;
+                color: grey;
+                max-width: 150px;
             }
             #info{
-                
+                color: grey;
                 max-width: 150px;
             }
             #speed{
-               
+                color: grey;
                 max-width: 70px;
             }
             #retry{

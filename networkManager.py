@@ -72,7 +72,7 @@ class NetworkManager:
             'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:90.0) Gecko/20100101 Firefox/90.0'
         ]
 
-        segment_path = Path(f"{Path().home()}/.blackjuice/temp/.{os.path.basename(filename)}")
+        segment_path = Path(f"{Path().home()}/.venaApp/temp/.{os.path.basename(filename)}")
         segment_path.mkdir(parents=True, exist_ok=True)
         segment_filename = segment_path / f'part{segment_id}'
 
@@ -129,7 +129,7 @@ class NetworkManager:
             'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:90.0) Gecko/20100101 Firefox/90.0'
         ]
 
-        segment_path = Path(f"{Path().home()}/.blackjuice/temp/.{os.path.basename(filename)}")
+        segment_path = Path(f"{Path().home()}/.venaApp/temp/.{os.path.basename(filename)}")
         segment_path.mkdir(parents=True, exist_ok=True)
         segment_filename = segment_path / f'part{seg_no}'
 

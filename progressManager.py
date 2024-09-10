@@ -11,10 +11,10 @@ class ProgressManager:
         self.last_update_time = {}  # Store the last update time for each file
         self.update_interval = 0.8  # Update every 0.8 seconds 
 
-    async def update_file_details_on_storage_during_download(self, filename, address,size, downloaded, status, speed, date):
+    async def update_file_details_on_storage_during_download(self, filename, address,size, downloaded, state, speed,percentage, date):
         # Update file details in storage during download
-        await asyncio.to_thread(self.parent.update_download, filename, status, size,downloaded, date, speed)
-        await asyncio.to_thread(storage.update_data, filename, address,size, downloaded, status, date)
+        await asyncio.to_thread(self.parent.update_download, filename, state, size,downloaded, date, speed, percentage)
+        await asyncio.to_thread(storage.update_data, filename, address,size, downloaded, state, percentage,date)
 
     async def _handle_segments_downloads_ui(self,filename, link, total_size):
         
@@ -34,7 +34,7 @@ class ProgressManager:
                         percentage = round((total_downloaded / total_size) * 100, 0)
 
                         await self.update_file_details_on_storage_during_download(
-                            filename, link, total_size, total_downloaded, f'{percentage}%', speed_str, time.strftime(r'%Y-%m-%d')
+                            filename, link, total_size, total_downloaded, f'Downloading..', speed_str,f'{percentage}%', time.strftime(r'%Y-%m-%d')
                         )
 
                         # Update the last update time for this file
@@ -57,7 +57,7 @@ class ProgressManager:
             
                 
                 await self.update_file_details_on_storage_during_download(
-                    filename, link, size, downloaded_chunk, f'{percentage}%', speed_str, time.strftime(r'%Y-%m-%d')
+                    filename, link, size, downloaded_chunk, f'Downloading..', speed_str,f'{percentage}%', time.strftime(r'%Y-%m-%d')
                 )
 
                 # Update the last update time for this file

@@ -47,7 +47,7 @@ class TaskManager():
             path = AppSettings().default_download_path.__str__()
             
         await asyncio.to_thread(self.parent.add_download_to_list ,filename, address, path, date)
-        await asyncio.to_thread(storage.add_data,filename,address, '---', '---', 'waiting...', date, path)
+        await asyncio.to_thread(storage.add_data,filename,address, '---', '---', 'Waiting...', date, path)
 
      
     def return_filename_with_extension(self, path, filename, content_type):
@@ -172,50 +172,50 @@ class TaskManager():
                     else:
                         error_message = f"failed! : Unexpected status {resp.status}"
                         await self.progress_manager.update_file_details_on_storage_during_download(
-                filename,link, size, downloaded_chunk, error_message, speed, time.strftime('%Y-%m-%d'))
+                filename,link, size, downloaded_chunk, error_message, speed, '---', time.strftime('%Y-%m-%d'))
                         
             
             except aiohttp.ClientError as e: 
                 error_message = f"failed! : ClientError - {str(e)}"
                 print(e)
                 await self.progress_manager.update_file_details_on_storage_during_download(
-                    filename, link, size, downloaded_chunk, error_message, speed, time.strftime('%Y-%m-%d')
+                    filename,link, size, downloaded_chunk, error_message, speed, '---', time.strftime('%Y-%m-%d')
                 )
             except asyncio.TimeoutError as e:
                 error_message = f"failed! : TimeoutError - {str(e)}"
                 print(e)
                 await self.progress_manager.update_file_details_on_storage_during_download(
-                    filename, link, size, downloaded_chunk, error_message, speed, time.strftime('%Y-%m-%d')
+                    filename,link, size, downloaded_chunk, error_message, speed, '---', time.strftime('%Y-%m-%d')
                 )
             except ssl.SSLError as e:
                 error_message = f"failed! : SSLError - {str(e)}"
                 print(e)
                 await self.progress_manager.update_file_details_on_storage_during_download(
-                    filename, link, size, downloaded_chunk, error_message, speed, time.strftime('%Y-%m-%d')
+                    filename,link, size, downloaded_chunk, error_message, speed, '---', time.strftime('%Y-%m-%d')
                 )
             except OSError as e:
                 error_message = f"failed! : OSError - {str(e)}"
                 print(e)
                 await self.progress_manager.update_file_details_on_storage_during_download(
-                    filename, link, size, downloaded_chunk, error_message, speed, time.strftime('%Y-%m-%d')
+                    filename,link, size, downloaded_chunk, error_message, speed, '---', time.strftime('%Y-%m-%d')
                 )
             except ValueError as e:
                 error_message = f"failed! : ValueError - {str(e)}"
                 print(e)
                 await self.progress_manager.update_file_details_on_storage_during_download(
-                    filename, link, size, downloaded_chunk, error_message, speed, time.strftime('%Y-%m-%d')
+                    filename,link, size, downloaded_chunk, error_message, speed, '---', time.strftime('%Y-%m-%d')
                 )
             except RuntimeError as e:
                 error_message = f"failed! : RuntimeError - {str(e)}"
                 print(e)
                 await self.progress_manager.update_file_details_on_storage_during_download(
-                    filename, link, size, downloaded_chunk, error_message, speed, time.strftime('%Y-%m-%d')
+                    filename,link, size, downloaded_chunk, error_message, speed, '---', time.strftime('%Y-%m-%d')
                 )
             except Exception as e:
                 error_message = f"failed! : {str(e)}"
                 print("Error is", e)
                 await self.progress_manager.update_file_details_on_storage_during_download(
-                    filename, link, size, downloaded_chunk, error_message, speed, time.strftime('%Y-%m-%d')
+                    filename,link, size, downloaded_chunk, error_message, speed, '---', time.strftime('%Y-%m-%d')
                 )
 
                 
@@ -231,7 +231,7 @@ class TaskManager():
                         'resume': False
                     }
        
-        await self.update_all_active_downloads('paused.')
+        await self.update_all_active_downloads('Paused')
 
     async def resume_downloads_fn(self, name, address, downloaded):
 
@@ -246,7 +246,7 @@ class TaskManager():
             if name == filename:                          
                 await self.addQueue((info['link'], filename, None))
             
-        await self.update_all_active_downloads('resuming...')      
+        await self.update_all_active_downloads('Resuming..')      
         async with self.condition:
             self.condition.notify_all()
 
@@ -257,7 +257,7 @@ class TaskManager():
         speed = 0
         for filename, info in self.paused_downloads.items():
             await self.progress_manager.update_file_details_on_storage_during_download(
-                filename, info['link'], info['size'], info['downloaded'], status,speed, time.strftime(r'%Y-%m-%d')
+                filename, info['link'], info['size'], info['downloaded'], status,speed, '---', time.strftime(r'%Y-%m-%d')
             )
 
                 

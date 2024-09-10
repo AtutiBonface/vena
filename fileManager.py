@@ -49,7 +49,7 @@ class FileManager:
 
     async def combine_segments(self, filename, link, size, num_segments):      
         basename = os.path.basename(filename)
-        tem_folder = f"{Path().home()}/.blackjuice/temp/.{basename}"
+        tem_folder = f"{Path().home()}/.venaApp/temp/.{basename}"
 
         try:        
             async with aiofiles.open(filename, 'wb') as final_file:
@@ -65,12 +65,12 @@ class FileManager:
             shutil.rmtree(tem_folder)
             
             await self.task_manager.progress_manager.update_file_details_on_storage_during_download(
-                filename, link, size, size, 'completed.', 0, time.strftime(r'%Y-%m-%d'))
+                filename, link, size, size, 'Finished.', 0,'', time.strftime(r'%Y-%m-%d'))
         except Exception as e:
             
             downloaded = self.task_manager.size_downloaded_dict[filename][0]
             await self.task_manager.progress_manager.update_file_details_on_storage_during_download(
-                filename, link, size, downloaded, 'failed!', 0, time.strftime(r'%Y-%m-%d'))
+                filename, link, size, downloaded, 'Failed!', 0,'', time.strftime(r'%Y-%m-%d'))
 
 
 
@@ -93,7 +93,7 @@ class FileManager:
                         'link': link
                     }
                     await self.task_manager.progress_manager.progress_manager.update_file_details_on_storage_during_download(
-                        filename, link, size, downloaded_chunk, 'paused.',speed, time.strftime(r'%Y-%m-%d')
+                        filename, link, size, downloaded_chunk, 'Paused.',speed,'', time.strftime(r'%Y-%m-%d')
                     )
         
                     return
@@ -107,6 +107,6 @@ class FileManager:
                 del self.task_manager.paused_downloads[filename]
 
             await self.task_manager.progress_manager.update_file_details_on_storage_during_download(
-                filename, link, size, size, 'completed.',speed, time.strftime(r'%Y-%m-%d')
+                filename, link, size, size, 'Finished.',speed,'', time.strftime(r'%Y-%m-%d')
             )
         

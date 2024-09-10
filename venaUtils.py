@@ -36,15 +36,15 @@ class Colors():
 class ConfigFilesHandler:
     def __init__(self) -> None:
         # Define the path to the config file
-        self.path_to_config_file = Path.home() / ".blackjuice" / "config.txt"
+        self.path_to_config_file = Path.home() / ".venaApp" / "config.txt"
 
-        self.defaut_download_path = Path.home() / "Downloads" / "blackjuice"
+        self.defaut_download_path = Path.home() / "Downloads" / "VenaApp"
 
     def create_config_file(self):
         self.settings_config = [
-            "### Settings configuration for Blackjuice ### \n",
+            "### Settings configuration for Vena ### \n",
             "\n",
-            "*Note* Do not write or edit this file because your Blackjuice Downloader will be faulty! Very faulty!\n",
+            "*Note* Do not write or edit this file because your Vena Downloader will be faulty! Very faulty!\n",
             "\n",
             f"default_download_path <x:e> {self.defaut_download_path} \n",
             "max_concurrent_downloads <x:e> 5 \n",
@@ -53,8 +53,8 @@ class ConfigFilesHandler:
             "show_progress_window <x:e> true \n",
             "show_download_complete_window <x:e> true \n",
             "\n",
-            "extensions_link <x:e> https://blackjuice.imaginekenya.site/addons\n",
-            "VERSION <x:e> blackjuice 2.0 \n"
+            "extensions_link <x:e> https://vena.imaginekenya.site/addons\n",
+            "VERSION <x:e> Vena 2.0 \n"
         ]
 
         try:
