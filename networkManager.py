@@ -22,12 +22,9 @@ class NetworkManager:
         }
 
         logging.basicConfig(level=logging.INFO)
-        self.logger = logging.getLogger(__name__)
-
-        
+        self.logger = logging.getLogger(__name__)        
         # SSL context to use certifi's certificates
         self.ssl_context = ssl.create_default_context(cafile=certifi.where())
-        self.connector = aiohttp.TCPConnector(ssl=self.ssl_context, limit=None, limit_per_host=10)
 
     async def create_session(self, connector):
         # Create an aiohttp session with a custom connector and headers

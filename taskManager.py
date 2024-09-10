@@ -1,8 +1,7 @@
 import os, asyncio,aiohttp, ssl, certifi, time, threading, re
 from asyncio import Queue 
 from settings import AppSettings
-import aiofiles, storage
-from pathlib import Path
+import  storage
 import shutil, m3u8
 from venaUtils import OtherMethods
 from urllib.parse import urlparse, urlunparse, urljoin
@@ -41,12 +40,6 @@ class TaskManager():
             self.condition = asyncio.Condition() # Condition to notify when the queue is not empty
             self.paused_downloads = {} # Dictionary to keep track of paused downloads
             self.is_paused = False
-
-            self.loop = asyncio.new_event_loop()## creating a new loop
-            self.download_thread = threading.Thread(target=self.download_task_manager, daemon=True)
-            # starting a different thread to run downloads
-            self.download_thread.start()
-
             self.is_downloading = False
     async def append_file_details_to_storage(self, filename, path, address, date):
         # Append file details to storage
@@ -69,73 +62,48 @@ class TaskManager():
         await asyncio.to_thread(self.parent.update_filename,old_f_name, new_f_name )
         await asyncio.to_thread(storage.update_filename, old_f_name, new_f_name)
 
-
-
-    def download_task_manager(self):
-        # Manage the download tasks using asyncio
-        asyncio.set_event_loop(self.loop)
-        self.loop.run_until_complete(self.download_tasks())
-        
-
-    
     async def addQueue(self, file):  
         # Add a file to the download queue     
         self.links_and_filenames.put_nowait(file)        # adds to queue,              
-            
         async with self.condition:
-            await self.condition.notify_all()
-
+            self.condition.notify_all()
         return
-
-        # sends a notification that a queue was added
-        
+        # sends a notification that a queue was added        
     ## this adds index to file name if file exists
     
-
     async def download_tasks(self):
-       
         self.is_downloading = True
-       
         while True:
             # waits for self.links and filename queue to have link if it there are links it continues 
             # otherwise it keeps waiting this prevents while True not to run forever as it consumes alot cpu
             async with self.condition:
-                await self.condition.wait()
-               
-
+                await self.condition.wait()           
             while not self.links_and_filenames.empty():
                 file = await self.links_and_filenames.get()
                 link, filename, path = file
                 if not filename in self.paused_downloads:## filename in paused downloads has path with it but if it does not exist it creates name together with path selected
                     filename = self.file_manager.validate_filename(filename, path)
                     name_with_no_path = os.path.basename(filename)
-                    await self.append_file_details_to_storage(name_with_no_path, path, link, time.strftime(r'%Y-%m-%d'))
-                   
-                file = (link, filename, path)
-                
+                    await self.append_file_details_to_storage(name_with_no_path, path, link, time.strftime(r'%Y-%m-%d')) 
+                file = (link, filename, path)                
                 async with self.file_semaphore:  # Limit concurrent file downloads
                     asyncio.create_task(self.start_task(file))
                 self.links_and_filenames.task_done()
-
             if self.links_and_filenames.empty():
                 self.is_downloading = False
 
     async def start_task(self, file): 
         link, filename ,path= file
         ssl_context = ssl.create_default_context(cafile=certifi.where())
-        connector = aiohttp.TCPConnector(ssl=ssl_context, limit=None)
+        connector = aiohttp.TCPConnector(ssl=ssl_context, limit=None, limit_per_host=10)
         created_session = await self.network_manager.create_session(connector)
-
         async with created_session as session:        
             downloaded_chunk = self.paused_downloads.get(filename, {}).get('downloaded', 0)
             size = 0
-            speed =0
-            
+            speed =0            
             try:
-                async with session.get(link) as resp:
-                   
-                    if resp.status in (200, 206):                      
-
+                async with session.get(link) as resp:                   
+                    if resp.status in (200, 206):                     
                         m3u8_extension_in_link = self.other_methods.get_m3u8_in_link(link)
                         if m3u8_extension_in_link:                            
                             segments_urls = []
@@ -145,12 +113,10 @@ class TaskManager():
                             content = await resp.text()
                             # Parse the M3U8 content
                             playlist = m3u8.loads(content)
-                            if not playlist.is_variant:
-                               
+                            if not playlist.is_variant:                               
                                 for segment in playlist.segments:
                                     segment_url = urljoin(base_url, segment.uri)                                   
-                                    segments_urls.append(segment_url)
-                                    
+                                    segments_urls.append(segment_url)                                    
                                 new_filename = await self.network_manager.get_filename_from_m3u8_content(session,path, segments_urls[0], filename)
                                 await self.update_changed_filename(filename, new_filename)
                                 filename = new_filename
@@ -158,12 +124,8 @@ class TaskManager():
                                 for url ,seg_no,  in zip(segments_urls, range(len(segments_urls))):
                                     async with self.segment_semaphore:
                                         m3u8_tasks.append(self.network_manager.download_m3u8_segment(session, url,filename, seg_no, self.headers, size))
-
                             await asyncio.gather(*m3u8_tasks)
-
-
                             await self.file_manager.combine_segments(filename, link, size, len(segments_urls))
-
                             async with self.lock:
                                 if filename in self.size_downloaded_dict:
                                     del self.size_downloaded_dict[filename]
@@ -181,9 +143,7 @@ class TaskManager():
                                 new_filename = self.return_filename_with_extension(path, filename, content_type)
 
                                 await self.update_changed_filename(filename, new_filename)
-
                                 filename = new_filename
-
 
                             range_supported = 'Accept-Ranges' in resp.headers
                             
@@ -201,19 +161,16 @@ class TaskManager():
                                     await asyncio.sleep(self.config.CONCURRENCY_DELAY)
 
                                 await asyncio.gather(*tasks)
-
                                 await self.file_manager.combine_segments(filename,link,size, num_segments)
 
                                 async with self.lock:
                                     if filename in self.size_downloaded_dict:
                                         del self.size_downloaded_dict[filename]  
-                            else:
-                               
+                            else:                               
                                 await self.file_manager._handle_download(resp, filename, link, downloaded_chunk)
                                
                     else:
                         error_message = f"failed! : Unexpected status {resp.status}"
-
                         await self.progress_manager.update_file_details_on_storage_during_download(
                 filename,link, size, downloaded_chunk, error_message, speed, time.strftime('%Y-%m-%d'))
                         

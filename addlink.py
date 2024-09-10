@@ -5,16 +5,16 @@ from PyQt6.QtGui import QIcon
 from settings import AppSettings
 from pathlib import Path
 from urllib.parse import urlparse , urlunparse ,urlsplit
-import asyncio
+from qasync import asyncSlot
 class AddLink(QWidget):
-    def __init__(self, url=None ,filename=None, bjdm =None):
+    def __init__(self, url=None ,filename=None, task_manager=None):
         super().__init__()
         self.setWindowTitle("Download file")
         self.setWindowIcon(QIcon('images/main.ico'))
         self.setGeometry(150, 150, 400, 220)
         self.center_window()
         self.app_settings = AppSettings()
-        self.xdm_instance = bjdm
+        self.task_manager = task_manager
         self.download_path = str(self.app_settings.default_download_path)
 
         self.selected_path = None
@@ -200,8 +200,8 @@ class AddLink(QWidget):
         # Remove any invalid characters for filenames on most operating systems
         return re.sub(r'[\\/*?:"<>|]', "", filename)
 
-
-    def add_task_to_downloads(self):
+    @asyncSlot()
+    async def add_task_to_downloads(self):
         link = self.address_entry.text()
         filename = self.filename_entry.text() 
 
@@ -240,9 +240,9 @@ class AddLink(QWidget):
                     self.selected_link = link
                     
                     ## adds link filename and path if selected to a queue
-                    asyncio.run_coroutine_threadsafe(self.xdm_instance.addQueue((link, filename, self.selected_path)),self.xdm_instance.loop)
+                    await self.task_manager.addQueue((link, filename, self.selected_path))
                     
-                    if self.xdm_instance.is_downloading:
+                    if self.task_manager.is_downloading:
                         
                         self.warning_label.setText("Task Added!")
                         self.warning_label.setStyleSheet("color: green;")

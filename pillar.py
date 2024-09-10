@@ -1,16 +1,16 @@
 import os,  asyncio , websockets, threading , json
 from venaUtils import OtherMethods, Colors, Images
-import storage, queue,time
-import sys
+import storage, queue
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,QScrollArea,QLineEdit,
     QPushButton, QFrame, QStackedWidget
 )
+from venaWorker import Worker
 from PyQt6.QtGui import QIcon, QAction, QFont
-from PyQt6.QtCore import Qt, QPoint,QSize 
+from PyQt6.QtCore import Qt, QPoint,QSize ,QThread
 from addlink import AddLink
-from qasync import QEventLoop, asyncSlot
-import pystray
+from qasync import asyncSlot
+import pystray 
 from taskManager import TaskManager
 
 
@@ -44,7 +44,7 @@ class MainApplication(QMainWindow):
     def setup_data(self):
         self.xengine_downloads  = {}
         self.load_downloads_from_db()
-        #self.xdm_class = TaskManager(self)
+        self.task_manager = TaskManager(self)
         self.other_methods = OtherMethods()
         self.update_queue = queue.Queue()
         self.about_page_opened = False
@@ -97,13 +97,25 @@ class MainApplication(QMainWindow):
     def bind_events(self):
         # Event binding code here
         pass
-    def closeEvent(self, event):
-      
+    def closeEvent(self, event):      
         if self.add_link_top_window is not None:
             self.add_link_top_window.close()
         event.accept()
+
+    async def run_all_tasks(self):    
+        await asyncio.gather(# Run both websocket_main and TaskManager's download_tasks
+            self.websocket_main(),
+            self.task_manager.download_tasks()
+        ) 
+
     def start_background_tasks(self):
-        threading.Thread(target=self.process_updates, daemon=True).start()
+        self.worker = Worker(self.update_queue)
+        self.worker_thread = QThread()
+        self.worker.moveToThread(self.worker_thread)
+        self.worker.update_signal.connect(self.update_file_widget)
+        self.worker_thread.started.connect(self.worker.start_working)
+        self.worker_thread.start()
+        
 
     # Sidebar related methods
     def create_sidebar(self):       
@@ -160,7 +172,7 @@ class MainApplication(QMainWindow):
                             url = file['link']
                             filename = file['name'] 
                             # Create the top window only once
-                            self.add_link_top_window = AddLink(url=url, filename=filename)                               
+                            self.add_link_top_window = AddLink(url=url, filename=filename, task_manager=self.task_manager)                               
                             self.add_link_top_window.show()                  
   
                 else:
@@ -168,12 +180,11 @@ class MainApplication(QMainWindow):
         except Exception as e:
             pass
 
-    def start_websocket_server(self):
-        asyncio.run(self.websocket_main())
+    
 
-    async def websocket_main(self):       
-        server = await websockets.serve(self.handle_websockets, '127.0.0.1', 65432)
-        await asyncio.Future()  # Run indefinitely, until the app is closed
+    async def websocket_main(self):  
+        server = await websockets.serve(self.handle_websockets, '127.0.0.1', 65432)        
+        await server.wait_closed()  
 
    
     # Database related methods
@@ -191,8 +202,7 @@ class MainApplication(QMainWindow):
             }
 
     # File management methods
-    def add_download_to_list(self, filename, address, path, date):
-        
+    def add_download_to_list(self, filename, address, path, date):        
         self.xengine_downloads[filename] = {
             'url': address,
             'status': 'waiting...',
@@ -209,6 +219,8 @@ class MainApplication(QMainWindow):
      
 
     def update_download(self, filename, status, size, downloaded ,date, speed):
+        size = str(size)
+        downloaded = str(downloaded)
         name = os.path.basename(filename)
         path = self.xengine_downloads[name]['path']       
         if name in self.xengine_downloads:
@@ -224,26 +236,26 @@ class MainApplication(QMainWindow):
 
          
     # UI update methods
-    def process_updates(self):
-        while True:
-            try:
-                filename, status, size, downloaded ,date = self.update_queue.get(timeout=0.1)
-                self.update_file_widget(filename, status, size, downloaded ,date)
-                                
-            except queue.Empty:
-                continue
 
-    def update_file_widget(self, filename, status, size, downloaded ,date):
-        
-        
+    def update_file_widget(self, filename, status, size, downloaded ,date):        
         if filename in self.file_widgets:
-            pass
+            self.file_widgets[filename].update_widget(filename, status,size, downloaded, date, '---', '---')
         else:
             self.add_new_file_widget(filename, status, size, date)
 
     def add_new_file_widget(self, filename, status, size, date):      
-
-       pass
+        file_item = FileItemWidget(
+                filename=f"{filename}",
+                file_size=f"{size}",
+                downloaded=f"---",
+                modified_date=f"{date}",
+                status=status,
+                percentage= f"---",
+                speed="---"
+            )
+        self.file_widgets[filename] = file_item 
+        self.file_list.file_layout.addWidget(file_item)
+       
     
     def display_all_downloads_on_page(self):
         for filename, detail in self.return_all_downloads().items():
@@ -255,8 +267,7 @@ class MainApplication(QMainWindow):
                 status=detail['status'],
                 percentage= f"10%",
                 speed="1.25mbs"
-            )            
-            
+            )           
             self.file_list.file_layout.addWidget(file_item)
            
 
@@ -287,7 +298,7 @@ class MainApplication(QMainWindow):
                 size = details['filesize']
                 link = details['url']
                 downloaded = details['downloaded']           
-                #asyncio.run_coroutine_threadsafe(self.xdm_class.pause_downloads_fn(filename_with_path, size, link ,downloaded), self.xdm_class.loop)
+                #asyncio.run_coroutine_threadsafe(self.task_manager.pause_downloads_fn(filename_with_path, size, link ,downloaded), self.task_manager.loop)
                 if f_name in self.progress_toplevels:                  
                     
                     del self.progress_toplevels[f_name]
@@ -306,10 +317,9 @@ class MainApplication(QMainWindow):
                     self.downloaded_chuck = 0
                 
                 
-                #asyncio.run_coroutine_threadsafe(self.xdm_class.resume_downloads_fn(filename_with_path,  details['url'], self.downloaded_chuck), self.xdm_class.loop)
+                #asyncio.run_coroutine_threadsafe(self.task_manager.resume_downloads_fn(filename_with_path,  details['url'], self.downloaded_chuck), self.task_manager.loop)
 
-    def update_filename(self, old_name, new_name):       
-
+    def update_filename(self, old_name, new_name):     
         pathless_old_name = os.path.basename(old_name)
         pathless_new_name = os.path.basename(new_name)
 
@@ -363,8 +373,8 @@ class MainApplication(QMainWindow):
 class TopBar(QFrame):
     def __init__(self, app):
         super().__init__()  
-        #self.app = app  
-        #self.xdm_instance = app.xdm_class   
+        self.app = app  
+        self.task_manager = app.task_manager   
         self.create_widgets()
         
     def create_widgets(self):
@@ -406,8 +416,8 @@ class TopBar(QFrame):
         pass      
 
     def open_link_box(self):       
-        #self.app.add_link_top_window = AddLink(bjdm=self.xdm_instance)
-        #self.app.add_link_top_window.show()   
+        self.app.add_link_top_window = AddLink(task_manager=self.task_manager)
+        self.app.add_link_top_window.show()   
         pass
 
 class BottomBar(QFrame):
@@ -523,10 +533,6 @@ class FileItemWidget(QFrame):
         downloaded = other_methods.return_filesize_in_correct_units(downloaded)
         image = other_methods.return_file_type(filename)
         self.setFixedHeight(60)
-
-        
-
-        
         # Create a horizontal layout to hold the icon and the text information
         main_layout = QHBoxLayout(self)
         main_layout.setSpacing(0)
@@ -537,48 +543,45 @@ class FileItemWidget(QFrame):
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         icon_label.setPixmap(QIcon(image).pixmap(20, 20))
 
-        main_layout.addWidget(icon_label)
-        
+        main_layout.addWidget(icon_label)        
 
         text_layout = QVBoxLayout()
         text_layout.setContentsMargins(0, 0, 0, 0)
         
         # Filename (top row)
-        filename_label = QLabel(filename)
-        filename_label.setStyleSheet("font-weight: bold;")
-        text_layout.addWidget(filename_label)
+        self.filename_label = QLabel(filename)
+        text_layout.addWidget(self.filename_label)
         text_layout.setObjectName("filename")
 
         details_layout = QHBoxLayout()
-        download_status = QLabel(f"{status}")
-        download_status.setObjectName('status')
-        download_info = QLabel(f"[ {downloaded} / {file_size} ]")
-        download_info.setObjectName("info")
-        download_speed = QLabel(f"{speed}")
-        download_speed.setObjectName('speed')
-        download_failed = QPushButton('retry')
-        download_failed.setObjectName('retry')
-        details_layout.addWidget(download_status)
-        details_layout.addWidget(download_info)
-        details_layout.addWidget(download_speed) 
+        self.download_status = QLabel(f"{status}")
+        self.download_status.setObjectName('status')
+        self.download_info = QLabel(f"[ {downloaded} / {file_size} ]")
+        self.download_info.setObjectName("info")
+        self.download_speed = QLabel(f"{speed}")
+        self.download_speed.setObjectName('speed')
+        self.download_failed = QPushButton('retry')
+        self.download_failed.setObjectName('retry')
+        details_layout.addWidget(self.download_status)
+        details_layout.addWidget(self.download_info)
+        details_layout.addWidget(self.download_speed) 
 
         if 'failed' in status:
-            details_layout.addWidget(download_failed)       
-        # Download info        
-        # Modified date
-        modified_label = QLabel(modified_date)
-        modified_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        details_layout.addWidget(modified_label)
+            details_layout.addWidget(self.download_failed)       
+        self.modified_label = QLabel(modified_date)
+        self.modified_label.setObjectName('modified_date')
+        self.modified_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        details_layout.addWidget(self.modified_label)
 
         text_layout.addLayout(details_layout)
         
         main_layout.addLayout(text_layout)
 
-        self.apply_font(filename_label, 'Arial', 11)
-        self.apply_font(download_status, 'Arial', 10)
-        self.apply_font(download_info, 'Arial', 9)
-        self.apply_font(download_speed, 'Arial', 10)
-        self.apply_font(download_failed, 'Arial', 9, underline=True, italic=True)
+        self.apply_font(self.filename_label, 'Arial', 10, False, True)
+        self.apply_font(self.download_status, 'Arial', 10)
+        self.apply_font(self.download_info, 'Arial', 9)
+        self.apply_font(self.download_speed, 'Arial', 10)
+        self.apply_font(self.download_failed, 'Arial', 9, underline=True, italic=True)
         
         self.setLayout(main_layout)
         self.setStyleSheet("""
@@ -680,8 +683,22 @@ class FileItemWidget(QFrame):
         font.setUnderline(underline)
         font.setItalic(italic)
         widget.setFont(font)
-        
-    
+
+    def update_widget(self, filename, status ,size, downloaded, modified_date, speed, percentage):
+        # Convert file size and downloaded size to correct units
+        other_methods = OtherMethods()
+        file_size = other_methods.return_filesize_in_correct_units(size)
+        downloaded = other_methods.return_filesize_in_correct_units(downloaded)
+        self.filename_label.setText(filename)
+        # Update file size and downloaded information
+        self.download_info.setText(f"[ {downloaded} / {file_size} ]")
+        # Update download status
+        self.download_status.setText(f"{status}")
+        # Update download speed
+        self.download_speed.setText(f"{speed}")
+        # Update modified date
+        self.modified_label.setText(modified_date)
+
     def mousePressEvent(self, event):
         """Triggered when the widget is clicked."""
         self.setStyleSheet("""
