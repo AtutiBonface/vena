@@ -8,6 +8,7 @@ from urllib.parse import urlparse, urlunparse, urljoin
 from fileManager import FileManager
 from networkManager import NetworkManager
 from progressManager import ProgressManager
+from collections import defaultdict
 
 class Config:
     CHUNK_SIZE = 256 * 1024  # 256 kb
@@ -38,8 +39,10 @@ class TaskManager():
             self.segment_semaphore = asyncio.Semaphore(self.config.MAX_CONCURRENT_SEGMENTS)
             self.ui_callback = parent
             self.condition = asyncio.Condition() # Condition to notify when the queue is not empty
+           
             self.paused_downloads = {} # Dictionary to keep track of paused downloads
-            self.is_paused = False
+            self.pause_events = defaultdict(asyncio.Event)
+            self.paused_downloads = {}
             self.is_downloading = False
     async def append_file_details_to_storage(self, filename, path, address, date):
         # Append file details to storage
@@ -116,15 +119,29 @@ class TaskManager():
                             if not playlist.is_variant:                               
                                 for segment in playlist.segments:
                                     segment_url = urljoin(base_url, segment.uri)                                   
-                                    segments_urls.append(segment_url)                                    
+                                    segments_urls.append(segment_url)
+
                                 new_filename = await self.network_manager.get_filename_from_m3u8_content(session,path, segments_urls[0], filename)
                                 await self.update_changed_filename(filename, new_filename)
                                 filename = new_filename
-                                size = await self.network_manager.get_total_size_of_m3u8(session, link, base_url)
-                                for url ,seg_no,  in zip(segments_urls, range(len(segments_urls))):
-                                    async with self.segment_semaphore:
-                                        m3u8_tasks.append(self.network_manager.download_m3u8_segment(session, url,filename, seg_no, self.headers, size))
-                            await asyncio.gather(*m3u8_tasks)
+                                size, segments_with_sizes = await self.network_manager.get_total_size_of_m3u8(session, link, base_url)
+
+                                for seg_no, url in enumerate(segments_urls):
+                                    async with self.segment_semaphore:                                        
+                                        task = asyncio.create_task(self.download_segment(session, filename, url, self.headers, None, None, seg_no, segments_with_sizes[url], size))
+                                        m3u8_tasks.append(task)
+                                       
+                                try:
+                                    await asyncio.gather(*m3u8_tasks)
+                                    await asyncio.sleep(self.config.CONCURRENCY_DELAY)
+                                except asyncio.CancelledError:
+                                    # Handle cancellation (e.g., due to pausing)
+                                    for task in m3u8_tasks:
+                                        if not task.done():
+                                            task.cancel()
+                                    await asyncio.gather(*m3u8_tasks, return_exceptions=True)
+                                    return
+                                
                             await self.file_manager.combine_segments(filename, link, size, len(segments_urls))
                             async with self.lock:
                                 if filename in self.size_downloaded_dict:
@@ -132,35 +149,41 @@ class TaskManager():
 
                         else:## if it is not a .m3u8 file
                             size = int(resp.headers.get('Content-Length', 0))
-                            content_type = resp.headers.get('Content-Type', '')                            
-
-                            pursed_url = urlparse(link)
-
+                            content_type = resp.headers.get('Content-Type', '')                           
+                            
                             f_n, ex = os.path.splitext(os.path.basename(filename))
-
-                            if not (f_n and ex):
-                               
+                            if not (f_n and ex): 
                                 new_filename = self.return_filename_with_extension(path, filename, content_type)
-
                                 await self.update_changed_filename(filename, new_filename)
                                 filename = new_filename
-
-                            range_supported = 'Accept-Ranges' in resp.headers
-                            
+                            range_supported = 'Accept-Ranges' in resp.headers                            
                             if size > self.config.SEGMENT_SIZE * 3 and range_supported:
                                 
                                 num_segments = (size + self.config.SEGMENT_SIZE - 1) // self.config.SEGMENT_SIZE
 
                                 tasks = []
+                                other_file_type_tasks = []
                                 for seg_no in range(num_segments):
                                     start = seg_no * self.config.SEGMENT_SIZE
                                     end = start + self.config.SEGMENT_SIZE - 1 if seg_no < num_segments - 1 else size - 1
-                                    async with self.segment_semaphore:
-                                        tasks.append(self.network_manager.fetch_segment(session, link, start, end, num_segments, filename, seg_no, size))
 
+                                    segment_size = end - start + 1
+
+                                    async with self.segment_semaphore:                                        
+                                        task = asyncio.create_task(self.download_segment(session, filename, link, self.headers, start, end, seg_no, segment_size, size))
+                                        other_file_type_tasks.append(task)
+                                       
+                                try:
+                                    await asyncio.gather(*other_file_type_tasks)
                                     await asyncio.sleep(self.config.CONCURRENCY_DELAY)
+                                except asyncio.CancelledError:
+                                    # Handle cancellation (e.g., due to pausing)
+                                    for task in other_file_type_tasks:
+                                        if not task.done():
+                                            task.cancel()
+                                    await asyncio.gather(*other_file_type_tasks, return_exceptions=True)
+                                    return
 
-                                await asyncio.gather(*tasks)
                                 await self.file_manager.combine_segments(filename,link,size, num_segments)
 
                                 async with self.lock:
@@ -221,9 +244,15 @@ class TaskManager():
                 
 
     
-
+    def _get_or_create_pause_event(self, filename):
+        if filename not in self.pause_events:
+            self.pause_events[filename] = asyncio.Event()
+            self.pause_events[filename].set()  # Initially not paused
+        return self.pause_events[filename]
 
     async def pause_downloads_fn(self, filename, size, link ,downloaded):
+        pause_event = self._get_or_create_pause_event(filename)
+        pause_event.clear()  # Set the pause flag for this file
         self.paused_downloads[filename] = {
                         'downloaded': downloaded,
                         'size': size,
@@ -231,10 +260,11 @@ class TaskManager():
                         'resume': False
                     }
        
-        await self.update_all_active_downloads('Paused')
+        await self.update_all_active_downloads('Paused', filename)
 
     async def resume_downloads_fn(self, name, address, downloaded):
-
+        pause_event = self._get_or_create_pause_event(filename)
+        pause_event.set()  # Clear the pause flag for this file
         self.paused_downloads[name] = {
             'downloaded': downloaded,
             'size': '---',
@@ -246,20 +276,32 @@ class TaskManager():
             if name == filename:                          
                 await self.addQueue((info['link'], filename, None))
             
-        await self.update_all_active_downloads('Resuming..')      
+        await self.update_all_active_downloads('Resuming..', filename)
         async with self.condition:
             self.condition.notify_all()
 
 
 
 
-    async def update_all_active_downloads(self, status):
+    async def update_all_active_downloads(self, status, filename):
         speed = 0
-        for filename, info in self.paused_downloads.items():
-            await self.progress_manager.update_file_details_on_storage_during_download(
-                filename, info['link'], info['size'], info['downloaded'], status,speed, '---', time.strftime(r'%Y-%m-%d')
-            )
+        info = self.paused_downloads.get(filename, {})
+        await self.progress_manager.update_file_details_on_storage_during_download(
+            filename, info.get('link', ''), info.get('size', '---'), 
+            info.get('downloaded', 0), status, speed, '---', 
+            time.strftime(r'%Y-%m-%d')
+        )
 
                 
                         
-        
+    async def download_segment(self, session, filename, url, headers, filestart, fileend, seg_no, segment_size, file_size):
+        pause_event = self._get_or_create_pause_event(filename)
+        while not pause_event.is_set():
+            try:
+                await asyncio.wait_for(pause_event.wait(), timeout=1.0)
+            except asyncio.TimeoutError:
+                # Check if we're still paused
+                if not pause_event.is_set():
+                    return  # Exit if still paused
+
+        return await self.network_manager.download_m3u8_media_plus_in_segments(session, filename, url, headers, filestart, fileend, seg_no, segment_size, file_size)
