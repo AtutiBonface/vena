@@ -349,8 +349,8 @@ class MainApplication(QMainWindow):
 
             file_widget = self.file_widgets[pathless_new_name]
 
-            #if file_widget.winfo_exists():
-                #file_widget.update_filename(new_name)
+            if file_widget.isVisible():
+                file_widget.update_filename(new_name)
 
         
 
@@ -568,22 +568,22 @@ class FileList(QScrollArea):
 class FileItemWidget(QFrame):
     def __init__(self, filename, file_size, downloaded,status, percentage, speed,modified_date):
         super().__init__()
-        other_methods = OtherMethods()       
-        file_size = other_methods.return_filesize_in_correct_units(file_size)
-        downloaded = other_methods.return_filesize_in_correct_units(downloaded)
-        image = other_methods.return_file_type(filename)
+        self.other_methods = OtherMethods()       
+        file_size = self.other_methods.return_filesize_in_correct_units(file_size)
+        downloaded = self.other_methods.return_filesize_in_correct_units(downloaded)
+        self.image = self.other_methods.return_file_type(filename)
         self.setFixedHeight(60)
         # Create a horizontal layout to hold the icon and the text information
         main_layout = QHBoxLayout(self)
         main_layout.setSpacing(0)
         main_layout.setContentsMargins(5, 0, 5, 0)
 
-        icon_label = QLabel()
-        icon_label.setObjectName('icon-label')
-        icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        icon_label.setPixmap(QIcon(image).pixmap(20, 20))
+        self.icon_label = QLabel()
+        self.icon_label.setObjectName('icon-label')
+        self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.icon_label.setPixmap(QIcon(self.image).pixmap(20, 20))
 
-        main_layout.addWidget(icon_label)        
+        main_layout.addWidget(self.icon_label)        
 
         text_layout = QVBoxLayout()
         text_layout.setContentsMargins(0, 0, 0, 0)
@@ -722,6 +722,11 @@ class FileItemWidget(QFrame):
             }
         """)
         super().leaveEvent(event)
+    def update_filename(self, new_name):
+        new_name = os.path.basename(new_name)
+        self.filename_label.setText(new_name)
+        self.image = self.other_methods.return_file_type(new_name)
+        self.icon_label.setPixmap(QIcon(self.image).pixmap(20, 20))
 
     def apply_font(self, widget, family,size, italic = False, bold=False, underline=False):
         font = QFont(family, size)

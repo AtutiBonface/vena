@@ -58,14 +58,6 @@ class NetworkManager:
                 return self.task_manager.return_filename_with_extension(f_path, name,  '')
             
     async def download_m3u8_media_plus_in_segments(self, session, filename ,address, headers, segment_start, segment_end, segment_id, segment_size, total_filesize):
-        if filename not in self.segment_trackers:
-            self.segment_trackers[filename] = SegmentTracker(filename)
-            await self.segment_trackers[filename].load_progress()
-
-        segment_tracker = self.segment_trackers[filename]
-        segment_progress = segment_tracker.get_segment_progress(segment_id)
-        segment_downloaded = segment_progress['downloaded']
-        segment_total = segment_size
         
         retry_attempts = 0
         max_retries = 5
@@ -80,11 +72,20 @@ class NetworkManager:
         segment_path.mkdir(parents=True, exist_ok=True)
         segment_filename = segment_path / f'part{segment_id}'
 
+        if filename not in self.segment_trackers:
+            self.segment_trackers[filename] = SegmentTracker(filename)
+            await self.segment_trackers[filename].load_progress()
+            
+        segment_tracker = self.segment_trackers[filename]
+        segment_progress = segment_tracker.get_segment_progress(segment_id)
+        segment_downloaded = segment_progress['downloaded']
+        segment_total = segment_size
+
         # Check if the segment is partially or fully downloaded
         if segment_filename.exists():
             segment_downloaded += segment_filename.stat().st_size
 
-        while retry_attempts < max_retries :
+        while retry_attempts < max_retries and not success:
            
             try:
                 headers = self.headers.copy()
@@ -116,22 +117,23 @@ class NetworkManager:
                                 if not pause_event.is_set():
                                     
                                     await self.task_manager.save_progress()
-                                    return False  # Indicate that the download was paused
+                                    return False  # Indicate that the download was paused'''
 
                                 await file.write(chunk)
                                 chunk_size = len(chunk)
                                 segment_downloaded += chunk_size
-                                print(f"---------------------started--------------{segment_downloaded}--------{segment_filename}")
                                 segment_tracker.update_segment(segment_id, segment_downloaded, segment_total)
                                 # Lock and update UI for download progress
-                                async with self.task_manager.lock:
+                                
+                                async with self.task_manager.file_locks[segment_filename]:
                                     if filename in self.task_manager.size_downloaded_dict:
                                         self.task_manager.size_downloaded_dict[filename][0] += len(chunk)
                                     else:
                                         self.task_manager.size_downloaded_dict[filename] = [len(chunk), time.time()]
-                                    await self.task_manager.progress_manager._handle_segments_downloads_ui(filename, address, total_filesize)
-                        
+                                await self.task_manager.progress_manager._handle_segments_downloads_ui(filename, address, total_filesize)
+                                
                         await segment_tracker.save_progress()
+                        success = True
                         return True  # inaonyesha downloading was successful
                     else:
                         self.logger.warning(f"Segment {segment_id} returned status {response.status}. Retry attempt {retry_attempts}.")

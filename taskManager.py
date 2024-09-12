@@ -27,7 +27,7 @@ class TaskManager():
             self.file_manager = FileManager(self.config, self)
             self.progress_manager = ProgressManager(self, parent)
             self.headers = self.network_manager.headers
-
+            self.file_locks = defaultdict(asyncio.Lock)
             self.lock = asyncio.Lock()  
             self.size_downloaded_dict = {}  
             self.other_methods = OtherMethods()              
@@ -47,7 +47,7 @@ class TaskManager():
     async def append_file_details_to_storage(self, filename, path, address, date):
         # Append file details to storage
         if not path:
-            path = AppSettings().default_download_path.__str__()
+            path = str(AppSettings().default_download_path)
             
         await asyncio.to_thread(self.parent.add_download_to_list ,filename, address, path, date)
         await asyncio.to_thread(storage.add_data,filename,address, '---', '---', 'Waiting...', date, path)
@@ -143,7 +143,7 @@ class TaskManager():
                                     return
                                 
                             await self.file_manager.combine_segments(filename, link, size, len(segments_urls))
-                            async with self.lock:
+                            async with self.file_locks[filename]:
                                 if filename in self.size_downloaded_dict:
                                     del self.size_downloaded_dict[filename]
 
@@ -186,7 +186,7 @@ class TaskManager():
 
                                 await self.file_manager.combine_segments(filename,link,size, num_segments)
 
-                                async with self.lock:
+                                async with self.file_locks[filename]:
                                     if filename in self.size_downloaded_dict:
                                         del self.size_downloaded_dict[filename]  
                             else:                               
@@ -263,7 +263,7 @@ class TaskManager():
         await self.update_all_active_downloads('Paused', filename)
 
     async def resume_downloads_fn(self, name, address, downloaded):
-        pause_event = self._get_or_create_pause_event(filename)
+        pause_event = self._get_or_create_pause_event(name)
         pause_event.set()  # Clear the pause flag for this file
         self.paused_downloads[name] = {
             'downloaded': downloaded,
