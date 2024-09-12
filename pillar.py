@@ -7,11 +7,14 @@ from PyQt6.QtWidgets import (
 )
 from venaWorker import Worker
 from PyQt6.QtGui import QIcon, QAction, QFont
-from PyQt6.QtCore import Qt, QPoint,QSize ,QThread
+from PyQt6.QtCore import Qt, QPoint,QSize ,QThread, QEvent
 from addlink import AddLink
 from qasync import asyncSlot
 import pystray 
+from downloadingIndicator import DownloadIndicator
 from taskManager import TaskManager
+from settingsPage  import SettingsWindow
+from aboutPage import AboutWindow
 
 
 class MainApplication(QMainWindow):
@@ -52,6 +55,7 @@ class MainApplication(QMainWindow):
         self.settings_page_opened = False
         self.home_page_opened = True
         self.about_frame = None
+        self.show_less_popup = DownloadIndicator(self)
         self.settings_frame = None
         self.previously_clicked_btn = None
         self.details_of_file_clicked = None
@@ -93,8 +97,8 @@ class MainApplication(QMainWindow):
     def create_pages(self):
         self.stacked_widget = QStackedWidget()
         self.home_page = self.content_area
-        self.about_page = AboutPage()
-        self.settings_page = SettingsPage()
+        self.about_page = AboutWindow()
+        self.settings_page = SettingsWindow()
         
         self.stacked_widget.addWidget(self.home_page)
         self.stacked_widget.addWidget(self.about_page)
@@ -166,6 +170,25 @@ class MainApplication(QMainWindow):
         # Move the window to the calculated position
         self.move(window_geometry.topLeft())
 
+    def changeEvent(self, event):
+        if event.type() == QEvent.Type.WindowStateChange:
+            # Check if the window is minimized
+            if self.isMinimized():
+                if not self.show_less_popup.isVisible():
+                    self.show_less_popup.show()
+
+               
+                      
+                
+           
+            elif self.isActiveWindow():
+                if  self.show_less_popup.isVisible():
+                    self.show_less_popup.hide()
+                
+            else:
+                print("Window is inactive or in a different state")
+                
+
     # WebSocket related methods
     @asyncSlot()
     async def handle_websockets(self, websocket, path):
@@ -227,7 +250,8 @@ class MainApplication(QMainWindow):
             'downloaded': '---',
             'filesize': '---',
             'modification_date': date,
-            'path': path
+            'path': path,
+            'percentage' : '0%'
         }
         self.update_queue.put((filename, 'Waiting..', '---','---','---','---', date))
     
@@ -256,9 +280,12 @@ class MainApplication(QMainWindow):
         else:
             self.add_new_file_widget(filename, status, size, date)
 
-    def add_new_file_widget(self, filename, status, size, date):      
+    def add_new_file_widget(self, filename, status, size, date): 
+        path = self.xengine_downloads[filename]['path']     
         file_item = FileItemWidget(
+                app = self,
                 filename=f"{filename}",
+                path = path,
                 file_size=f"{size}",
                 downloaded=f"---",
                 modified_date=f"{date}",
@@ -273,7 +300,9 @@ class MainApplication(QMainWindow):
     def display_all_downloads_on_page(self):
         for filename, detail in self.return_all_downloads().items():
             file_item = FileItemWidget(
+                app = self,
                 filename=f"{filename}",
+                path = detail['path'],
                 file_size=f"{detail['filesize']}",
                 downloaded=f"{detail['downloaded']}",
                 modified_date=f"{detail['modification_date']}",
@@ -307,7 +336,7 @@ class MainApplication(QMainWindow):
         f_name = os.path.basename(filename_with_path)
         self.load_downloads_from_db()## reasign values to xengine_downloads to get updated values for downloaded chuck
         for name , details in self.xengine_downloads.items():
-            if name == f_name and not (details['status'] == 'completed.' or details['status'] == '100.0%'):
+            if name == f_name and not  ( 'Finished' in details['status']or details['status'] == '100.0%'):
                 size = details['filesize']
                 link = details['url']
                 downloaded = details['downloaded']           
@@ -318,20 +347,23 @@ class MainApplication(QMainWindow):
 
 
     def resume_paused_file(self, filename_with_path):
+        def safe_int(value):
+            try:
+                return int(value)
+            except ValueError:
+                return 0
+            
         f_name = os.path.basename(filename_with_path) 
         self.load_downloads_from_db()## reasign values to xengine_downloads to get updated values for downloaded chuck
+        self.downloaded_chuck = 0
+        self.file_size = 0
         for name , details in self.xengine_downloads.items():
-            if name == f_name and not (details['status'] == 'completed.' or details['status'] == '100.0%'):
-                self.downloaded_chuck = 0
-                try:
-                    self.downloaded_chuck = int(details['downloaded'])                    
-
-                except Exception as e:                   
-                    self.downloaded_chuck = 0
-                
-                
-                #asyncio.run_coroutine_threadsafe(self.task_manager.resume_downloads_fn(filename_with_path,  details['url'], self.downloaded_chuck), self.task_manager.loop)
-
+            if name == f_name and not ('Finished' in details['status'] or details['percentage'] == '100.0%'):
+                self.downloaded_chuck = safe_int(details.get('downloaded', 0))
+                self.file_size = safe_int(details.get('filesize', 0))               
+    
+                asyncio.create_task(self.task_manager.resume_downloads_fn(filename_with_path,  details['url'], self.downloaded_chuck))
+        
     def update_filename(self, old_name, new_name):     
         pathless_old_name = os.path.basename(old_name)
         pathless_new_name = os.path.basename(new_name)
@@ -566,8 +598,11 @@ class FileList(QScrollArea):
         
 
 class FileItemWidget(QFrame):
-    def __init__(self, filename, file_size, downloaded,status, percentage, speed,modified_date):
+    def __init__(self,app, filename,path, file_size, downloaded,status, percentage, speed,modified_date):
         super().__init__()
+        self.app = app
+        self.file_path = path
+        self.filename  = filename
         self.other_methods = OtherMethods()       
         file_size = self.other_methods.return_filesize_in_correct_units(file_size)
         downloaded = self.other_methods.return_filesize_in_correct_units(downloaded)
@@ -593,7 +628,7 @@ class FileItemWidget(QFrame):
         text_layout.addWidget(self.filename_label)
         text_layout.setObjectName("filename")
 
-        details_layout = QHBoxLayout()
+        self.details_layout = QHBoxLayout()
         self.download_status = QLabel(f"{status}")
         self.download_status.setObjectName('status')
         self.download_info = QLabel(f"[ {downloaded} / {file_size} ]")
@@ -602,18 +637,25 @@ class FileItemWidget(QFrame):
         self.download_speed.setObjectName('speed')
         self.download_failed = QPushButton('retry')
         self.download_failed.setObjectName('retry')
-        details_layout.addWidget(self.download_status)
-        details_layout.addWidget(self.download_info)
-        details_layout.addWidget(self.download_speed) 
+        
+        if 'failed' in status.lower():
+            self.download_status.setText("Failed!")
+        self.details_layout.addWidget(self.download_status)
+        self.details_layout.addWidget(self.download_info)
+        self.details_layout.addWidget(self.download_speed) 
+           
 
         if 'failed' in status.lower():
-            details_layout.addWidget(self.download_failed)       
+            self.details_layout.addWidget(self.download_failed) 
+            self.download_failed.clicked.connect(self.retry_downloading)  
+            
+             
         self.modified_label = QLabel(modified_date)
         self.modified_label.setObjectName('modified_date')
         self.modified_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        details_layout.addWidget(self.modified_label)
+        self.details_layout.addWidget(self.modified_label)
 
-        text_layout.addLayout(details_layout)
+        text_layout.addLayout(self.details_layout)
         
         main_layout.addLayout(text_layout)
 
@@ -651,7 +693,7 @@ class FileItemWidget(QFrame):
             }
             #retry{
                 max-width: 60px;
-                color: green;                           
+                color: orange;                           
             }
             #retry:hover{
                 color: #48D1CC; 
@@ -683,7 +725,7 @@ class FileItemWidget(QFrame):
             }
             #retry{
                 max-width: 60px;
-                color: green; 
+                color: orange; 
             }
             #retry:hover{
                 color: #48D1CC; 
@@ -715,7 +757,7 @@ class FileItemWidget(QFrame):
             }
             #retry{
                 max-width: 60px;
-                color: green; 
+                color: orange; 
             }
             #retry:hover{
                 color: #48D1CC; 
@@ -746,11 +788,16 @@ class FileItemWidget(QFrame):
         # Update download status
         if 'finished' in status.lower():
             self.download_status.setText(f"{status} ")
+            if self.download_failed.isVisible():
+                self.details_layout.removeWidget(self.download_failed)   
         elif 'failed' in status.lower():
-            self.download_status.setText(f"Failed!")
+            self.download_status.setText(f"Failed!") 
+            self.details_layout.removeWidget(self.modified_label)                       
+            self.details_layout.addWidget(self.download_failed) 
+            self.details_layout.addWidget(self.modified_label)
+            self.download_failed.clicked.connect(self.retry_downloading)
         else:
             self.download_status.setText(f"{status} {percentage}")
-
         # Update download speed
         if not speed == '0':
             self.download_speed.setText(f"{speed}")
@@ -758,6 +805,11 @@ class FileItemWidget(QFrame):
             self.download_speed.setText(f"")
         # Update modified date
         self.modified_label.setText(modified_date)
+
+    def retry_downloading(self):
+        
+        filename_with_path = os.path.join(self.file_path, self.filename )
+        self.app.resume_paused_file(filename_with_path)
 
     def mousePressEvent(self, event):
         """Triggered when the widget is clicked."""
@@ -783,7 +835,7 @@ class FileItemWidget(QFrame):
             }
             #retry{
                 max-width: 60px;
-                color: green; 
+                color: orange; 
             }
             #retry:hover{
                 color: #48D1CC; 
@@ -942,36 +994,5 @@ class CustomTitleBar(QFrame):
         delta = QPoint(event.globalPosition().toPoint() - self.old_pos)
         self.parent.move(self.parent.x() + delta.x(), self.parent.y() + delta.y())
         self.old_pos = event.globalPosition().toPoint()
-
-
-
-class AboutPage(QWidget):
-    def __init__(self):
-        super().__init__()
-        self.setup_ui()
-
-    def setup_ui(self):
-        layout = QVBoxLayout()
-        label = QLabel("About Page")
-        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(label)
-        self.setLayout(layout)
-
-class SettingsPage(QWidget):
-    def __init__(self):
-        super().__init__()
-        self.setup_ui()
-
-    def setup_ui(self):
-        layout = QVBoxLayout()
-        label = QLabel("Settings Page")
-        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(label)
-        self.setLayout(layout)
-
-
-
-
-
 
 

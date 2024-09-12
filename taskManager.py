@@ -120,10 +120,11 @@ class TaskManager():
                                 for segment in playlist.segments:
                                     segment_url = urljoin(base_url, segment.uri)                                   
                                     segments_urls.append(segment_url)
-
+                        
                                 new_filename = await self.network_manager.get_filename_from_m3u8_content(session,path, segments_urls[0], filename)
                                 await self.update_changed_filename(filename, new_filename)
                                 filename = new_filename
+
                                 size, segments_with_sizes = await self.network_manager.get_total_size_of_m3u8(session, link, base_url)
 
                                 for seg_no, url in enumerate(segments_urls):

@@ -113,5 +113,3 @@ def check_filename_existance(f_name):
     conn.close()
 
     return count > 0
-
-

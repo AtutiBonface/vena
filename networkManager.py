@@ -77,13 +77,12 @@ class NetworkManager:
             await self.segment_trackers[filename].load_progress()
             
         segment_tracker = self.segment_trackers[filename]
-        segment_progress = segment_tracker.get_segment_progress(segment_id)
-        segment_downloaded = segment_progress['downloaded']
+        segment_progress = segment_tracker.get_segment_progress(segment_id)        
         segment_total = segment_size
 
         # Check if the segment is partially or fully downloaded
         if segment_filename.exists():
-            segment_downloaded += segment_filename.stat().st_size
+            segment_downloaded = segment_progress['downloaded']
 
         while retry_attempts < max_retries and not success:
            

@@ -366,6 +366,24 @@ class OtherMethods():
             }#Resume-btn:hover{
                 icon: url('images/play-button-filled.png');
             }
+            QScrollBar:vertical {
+                border: none;
+                background: #e2e7eb;
+                width: 18px;
+                margin: 20px 3px 20px 3px;
+                border-radius: 5px;
+            }
+            QScrollBar::handle:vertical {
+                background: #48D1CC;
+                min-height: 70px;
+                border-radius: 5px;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                background: none;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: none;
+            }
             
             
         """

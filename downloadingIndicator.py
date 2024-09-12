@@ -47,8 +47,9 @@ class CircularProgress(QWidget):
        
 
 class DownloadIndicator(QWidget):
-    def __init__(self):
+    def __init__(self, app):
         super().__init__()
+        self.app = app
 
         self.setWindowFlags(Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.FramelessWindowHint)
         self.setFixedSize(280, 120)
@@ -68,6 +69,7 @@ class DownloadIndicator(QWidget):
         expand_app_button = QPushButton(QIcon('images/up.png'), "")
         close_button.setIconSize(QSize(10, 10))
         expand_app_button.setIconSize(QSize(15, 15))
+        expand_app_button.clicked.connect(self.open_app)
         title_bar.setObjectName("title-bar")
         expand_app_button.setObjectName("expand-btn")
         close_button.setObjectName("close-btn")
@@ -163,6 +165,11 @@ class DownloadIndicator(QWidget):
                 background-color: #e2e7eb;
             }
         """)
+
+    def open_app(self):
+        print("working")
+        self.app.raise_()  # Bring it to the front
+        self.app.activateWindow()  # Also give it focus
     def close_window(self):
         self.close()
         
