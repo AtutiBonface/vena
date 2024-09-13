@@ -1,7 +1,9 @@
-from PyQt6.QtCore import QObject, QThread, pyqtSignal
+from PyQt6.QtCore import QObject, pyqtSignal
 import queue
 import json, aiofiles,os
 from pathlib import Path
+from PyQt6.QtWidgets import QMenu, QSystemTrayIcon
+from PyQt6.QtGui import QIcon,QAction
 
 class Worker(QObject):
     update_signal = pyqtSignal(str, str, str, str,str, str, str)
@@ -45,3 +47,21 @@ class SegmentTracker:
 
     def get_segment_progress(self, segment_id):
         return self.segments.get(segment_id, {'downloaded': 0, 'total': 0})
+
+
+class SetAppTray():
+    def __init__(self, app) -> None:
+        self.tray_icon = QSystemTrayIcon(QIcon("images/main.ico"), app)
+        self.tray_icon_menu = QMenu()        
+        # Create actions for the tray icon menu
+        self.restore_action = QAction("Restore")
+        self.restore_action.triggered.connect(app.restore_window)
+        self.quit_action = QAction("Quit")
+        self.quit_action.triggered.connect(app.quit_application)
+
+        self.tray_icon.activated.connect(app.on_tray_icon_activated)
+        
+        self.tray_icon_menu.addAction(self.restore_action)
+        self.tray_icon_menu.addAction(self.quit_action)
+        self.tray_icon.setContextMenu(self.tray_icon_menu)
+        

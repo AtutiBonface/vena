@@ -29,14 +29,17 @@ class MainWindow(QMainWindow):
                 border-radius: 5px;
             }
             QMenu::item {
-                padding: 5px 25px 5px 30px;
+                padding: 5px 5px 5px 5px;
                 border-radius: 3px;
+                width: 180px;
             }
             QMenu::item:selected {
                 background-color: #e6e6e6;
             }
             QMenu::icon {
                 position: absolute;
+                height: 15px;
+                width; 15PX;
                 left: 5px;
                 top: 5px;
             }
@@ -47,11 +50,10 @@ class MainWindow(QMainWindow):
         self.menu = QMenu(self)
         
         # Add menu items with icons
-        self.menu.addAction(QIcon("path_to_unread_icon.png"), "Unread")
-        self.menu.addAction(QIcon("path_to_contacts_icon.png"), "Contacts")
-        self.menu.addAction(QIcon("path_to_non_contacts_icon.png"), "Non-contacts")
-        self.menu.addAction(QIcon("path_to_groups_icon.png"), "Groups")
-        self.menu.addAction(QIcon("path_to_drafts_icon.png"), "Drafts")
+        self.menu.addAction(QIcon("images/add-link.png"), "Add Links")
+        self.menu.addAction(QIcon("images/clean.png"), "Clear Finished")
+        self.menu.addAction(QIcon("images/remove.png"), "Delete Selected")
+       
 
         # Set the menu for the dropdown button
         self.dropdown_button.setMenu(self.menu)

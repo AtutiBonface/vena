@@ -7,13 +7,15 @@ from pathlib import Path
 from urllib.parse import urlparse , urlunparse ,urlsplit
 from qasync import asyncSlot
 class AddLink(QWidget):
-    def __init__(self, url=None ,filename=None, task_manager=None):
+    def __init__(self, app= None, url=None ,filename=None, task_manager=None):
         super().__init__()
         self.setWindowTitle("Download file")
         self.setWindowIcon(QIcon('images/main.ico'))
         self.setGeometry(150, 150, 400, 220)
         self.center_window()
         self.app_settings = AppSettings()
+        self.indicator = app.show_less_popup
+        self.app = app
         self.task_manager = task_manager
         self.download_path = str(self.app_settings.default_download_path)
 
@@ -253,3 +255,11 @@ class AddLink(QWidget):
 
                     self.selected_path = None # resets path stored
                     self.close()## once link is added the add_link is destroyed while the process toplevel is packed
+
+                    if  self.app.isHidden() or not self.app.isActiveWindow() or self.app.isMinimized():
+                        
+                        
+                        self.indicator.file_added()
+                        self.indicator.show()
+
+                    

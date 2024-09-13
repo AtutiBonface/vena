@@ -21,6 +21,8 @@ class Images():
         self.video = self.resource_path('images/video.png')
         self.image = self.resource_path('images/image.png')
 
+        self.logo = Image.open('images/main.ico')
+
 
 class DownloadingIndicatorBox():
     def __init__(self, parent):

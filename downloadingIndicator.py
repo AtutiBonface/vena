@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import QWidget, QLabel,QVBoxLayout,QPushButton, QHBoxLayout, QApplication, QFrame
-import sys
 from PyQt6.QtCore import Qt, QRect, QTimer, QSize, QPoint
-from PyQt6.QtGui import QPainter, QPen, QColor, QIcon, QPixmap, QFont
+from PyQt6.QtGui import QPainter, QPen, QColor, QIcon,  QFont
+import time
 
 
 class CircularProgress(QWidget):
@@ -77,60 +77,55 @@ class DownloadIndicator(QWidget):
         title_bar.setMaximumHeight(13)
         title_bar_layout.setSpacing(0)
 
-
         title_bar_layout.addWidget(network_button)
         title_bar_layout.addStretch()        
         title_bar_layout.addWidget(expand_app_button)
         title_bar_layout.addWidget(close_button)
         
-        body_layout = QHBoxLayout()
+        self.body_layout = QHBoxLayout()
         body = QFrame()
         body.setObjectName('body')
-        body_layout.setContentsMargins(0, 0, 0, 0)
-        body_layout.setSpacing(0)
-        body.setLayout(body_layout)
-        self.no_connection_ho_btn = QPushButton(QIcon('images/no-connection.png'), " Internet Connection lost !")
+        self.body_layout.setContentsMargins(0, 0, 0, 0)
+        self.body_layout.setSpacing(0)
+        body.setLayout(self.body_layout)
+        
 
-        self.no_connection_ho_btn.setObjectName("connection-lost-btn")
-        self.no_connection_ho_btn.setIconSize(QSize(30, 30))
-        download_finished =  QPushButton(QIcon('images/complete.png'), " download complete!")
-        download_finished.setIconSize(QSize(30, 30))
-        download_failed =  QPushButton(QIcon('images/failed.png'), " download failed!")
-        download_failed.setIconSize(QSize(25, 25))
-
-        task_added =  QPushButton(QIcon('images/add.png'), " Task added!")
-        task_added.setIconSize(QSize(25, 25))
-
-        tasks_frame = QFrame()        
-        tasks_layout = QVBoxLayout()
-        tasks_number_l = QLabel("Tasks (10)")
-        downloading_l = QLabel("Downloading (0)")
-        downloading_l.setStyleSheet("color: green;")
-        waiting_l = QLabel("Waiting (3)")
-        download_failed_label = QLabel("Failed (0)")
-        download_failed_label.setStyleSheet("color: brown; font-weight : bold;")
-        tasks_layout.addWidget(tasks_number_l)
-        tasks_layout.addWidget(downloading_l)
-        tasks_layout.addWidget(waiting_l)
-        #tasks_layout.addWidget(download_failed_label)
-        tasks_frame.setLayout(tasks_layout)
+        self.tasks_frame = QFrame()        
+        self.tasks_layout = QVBoxLayout()
+        self.tasks_number_l = QLabel("Tasks (10)")
+        self.downloading_l = QLabel("Downloading (0)")
+        self.downloading_l.setStyleSheet("color: green;")
+        self.waiting_l = QLabel("Waiting (3)")
+        self.download_failed_label = QLabel("Failed (0)")
+        self.download_failed_label.setStyleSheet("color: brown; font-weight : bold;")
+        self.tasks_layout.addWidget(self.tasks_number_l)
+        self.tasks_layout.addWidget(self.downloading_l)
+        self.tasks_layout.addWidget(self.waiting_l)
+        #self.tasks_layout.addWidget(self.download_failed_label)
+        self.tasks_frame.setLayout(self.tasks_layout)
         self.progress_bar = CircularProgress()
-        body_layout.addWidget(tasks_frame, stretch=1)    
-        body_layout.addWidget(self.progress_bar)
 
-        #body_layout.addWidget(task_added)
+        self.message_label = QPushButton("")
+        self.message_label.hide()
+
+        self.body_layout.addWidget(self.tasks_frame, stretch=1)    
+        self.body_layout.addWidget(self.progress_bar)
+
+        self.body_layout.addWidget(self.message_label)
 
         main_layout.addWidget(title_bar, stretch=0,alignment=Qt.AlignmentFlag.AlignTop)
         main_layout.addWidget(body, stretch=1)
 
-        self.apply_font(tasks_number_l, 'Helvetica', 10)
-        self.apply_font(download_failed_label, 'Helvetica', 10 )
-        self.apply_font(downloading_l, 'Helvetica', 10 )
-        self.apply_font(waiting_l, 'Helvetica', 10 )
-        self.apply_font(download_failed, 'Helvetica', 10 , bold=True)
-        self.apply_font(download_finished, 'Helvetica', 10 , bold=True)
-        self.apply_font(task_added, 'Helvetica', 10 , bold=True)
-        self.apply_font(self.no_connection_ho_btn, 'Helvetica', 10 , bold=True)
+
+        self.message_timer = QTimer(self)
+        self.message_timer.timeout.connect(self.clear_message)
+
+        self.apply_font(self.tasks_number_l, 'Helvetica', 10)
+        self.apply_font(self.download_failed_label, 'Helvetica', 10 )
+        self.apply_font(self.downloading_l, 'Helvetica', 10 )
+        self.apply_font(self.waiting_l, 'Helvetica', 10 )
+        
+        
         
 
         self.setStyleSheet("""
@@ -166,10 +161,43 @@ class DownloadIndicator(QWidget):
             }
         """)
 
+    def show_message(self, message, icon,duration=3000):
+        """
+        Show a temporary message on the screen.
+        :param message: The message to display
+        :param duration: Duration in milliseconds to show the message (default: 3 seconds)
+        """
+        self.tasks_frame.hide()
+        self.progress_bar.hide()
+        self.message_label.setText(message)
+        self.message_label.setIcon(QIcon(icon))
+        self.message_label.setIconSize(QSize(25, 25))
+        self.message_label.show()
+        self.message_timer.start(duration)
+
+    def clear_message(self):
+        """Clear the temporary message and stop the timer."""
+        self.message_label.hide()
+        self.message_timer.stop()
+
+        self.tasks_frame.show()
+        self.progress_bar.show()
+    def file_added(self):
+        self.show_message(" Task added!", 'images/add.png')
+
+    def download_completed(self):
+        self.show_message(" download complete!", 'images/complete.png', 4000)
+
+    def download_failed(self):
+        self.show_message(" download failed!", 'images/failed.png')
+
+    def no_internet_connection(self):
+        self.show_message(" Internet Connection lost !", 'images/no-connection.png', 5000)
+
     def open_app(self):
-        print("working")
-        self.app.raise_()  # Bring it to the front
-        self.app.activateWindow()  # Also give it focus
+        if self.app.isMinimized():
+            self.app.showNormal()
+        self.app.activateWindow()
     def close_window(self):
         self.close()
         
@@ -178,6 +206,16 @@ class DownloadIndicator(QWidget):
         x = screen_geometry.width() - self.width() - 40  # 40 px from the right
         y = screen_geometry.height() - self.height() - 70  # 70 px from the bottom
         self.move(x, y)
+
+    
+
+
+        
+
+
+        
+        
+        
 
     
 

@@ -3,18 +3,18 @@ from venaUtils import OtherMethods, Colors, Images
 import storage, queue
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,QScrollArea,QLineEdit,
-    QPushButton, QFrame, QStackedWidget
+    QPushButton, QFrame, QStackedWidget,QSystemTrayIcon,QMenu
 )
-from venaWorker import Worker
+from venaWorker import Worker, SetAppTray
 from PyQt6.QtGui import QIcon, QAction, QFont
 from PyQt6.QtCore import Qt, QPoint,QSize ,QThread, QEvent
 from addlink import AddLink
 from qasync import asyncSlot
-import pystray 
 from downloadingIndicator import DownloadIndicator
 from taskManager import TaskManager
 from settingsPage  import SettingsWindow
 from aboutPage import AboutWindow
+
 
 
 class MainApplication(QMainWindow):
@@ -22,11 +22,11 @@ class MainApplication(QMainWindow):
         super().__init__()
         storage.initiate_database()        
         self.setup_data()
+        self.setup_tray_icon()
         self.setup_window()
         self.setup_styles()
         self.create_widgets()
         self.setup_layout()
-        self.bind_events()
         self.start_background_tasks()
         self.display_all_downloads_on_page()
         
@@ -51,23 +51,14 @@ class MainApplication(QMainWindow):
         self.task_manager = TaskManager(self)
         self.other_methods = OtherMethods()
         self.update_queue = queue.Queue()
-        self.about_page_opened = False
-        self.settings_page_opened = False
-        self.home_page_opened = True
-        self.about_frame = None
         self.show_less_popup = DownloadIndicator(self)
-        self.settings_frame = None
         self.previously_clicked_btn = None
         self.details_of_file_clicked = None
-        self.more_actions = None
         self.running_tasks = {}
         self.file_widgets = {}
-        self.last_mtime = None
-        self.multi_file_picker_window = None
         self.files_to_be_downloaded = []   
         self.add_link_top_window = None
-        self.progress_toplevels = {} 
-        self.stray_icon = None
+        self.tray_icon = None
         
 
     def create_widgets(self):   
@@ -115,13 +106,32 @@ class MainApplication(QMainWindow):
         self.stacked_widget.setCurrentIndex(index)
         self.sidebar.update_button_styles(index)
 
-    def bind_events(self):
-        # Event binding code here
-        pass
-    def closeEvent(self, event):      
+    
+    
+    def closeEvent(self, event):
+        """ Override the close event to hide the window instead of quitting the application """
+        event.ignore()
+        self.hide()
+
+    def restore_window(self):
+        """ Restore the main window from the system tray """
+        self.showNormal()
+        self.activateWindow()
+
+    def quit_application(self):
+        """ Quit the application from the system tray icon menu """
         if self.add_link_top_window is not None:
             self.add_link_top_window.close()
-        event.accept()
+        QApplication.quit()
+
+    def on_tray_icon_activated(self, reason):
+        """ Handle tray icon activation to show the main window """
+        if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
+            self.restore_window() 
+
+    def setup_tray_icon(self):
+        self.tray_icon = SetAppTray(self)
+        self.tray_icon.tray_icon.show()
 
     async def run_all_tasks(self):    
         await asyncio.gather(# Run both websocket_main and TaskManager's download_tasks
@@ -136,7 +146,9 @@ class MainApplication(QMainWindow):
         self.worker.update_signal.connect(self.update_file_widget)
         self.worker_thread.started.connect(self.worker.start_working)
         self.worker_thread.start()
-        
+
+
+    
 
     # Sidebar related methods
     def create_sidebar(self):       
@@ -176,18 +188,13 @@ class MainApplication(QMainWindow):
             if self.isMinimized():
                 if not self.show_less_popup.isVisible():
                     self.show_less_popup.show()
-
-               
-                      
-                
            
             elif self.isActiveWindow():
                 if  self.show_less_popup.isVisible():
                     self.show_less_popup.hide()
                 
-            else:
-                print("Window is inactive or in a different state")
-                
+            
+        
 
     # WebSocket related methods
     @asyncSlot()
@@ -201,10 +208,8 @@ class MainApplication(QMainWindow):
                     count = int(data['count'])
                     digit = 1
                     if count > 1:
-                        self.files_to_be_downloaded = data['files'] 
-                        
+                        self.files_to_be_downloaded = data['files']                         
                                                                   
-                        
                     else:
                         url = ''
                         filename = ''            
@@ -212,7 +217,7 @@ class MainApplication(QMainWindow):
                             url = file['link']
                             filename = file['name'] 
                             # Create the top window only once
-                            self.add_link_top_window = AddLink(url=url, filename=filename, task_manager=self.task_manager)                               
+                            self.add_link_top_window = AddLink(app=self, url=url, filename=filename, task_manager=self.task_manager)                               
                             self.add_link_top_window.show()                  
   
                 else:
@@ -220,13 +225,10 @@ class MainApplication(QMainWindow):
         except Exception as e:
             pass
 
-    
-
     async def websocket_main(self):  
         server = await websockets.serve(self.handle_websockets, '127.0.0.1', 65432)        
         await server.wait_closed()  
 
-   
     # Database related methods
     def load_downloads_from_db(self):
         all_downloads = storage.get_all_data()
@@ -277,8 +279,14 @@ class MainApplication(QMainWindow):
     def update_file_widget(self, filename, status, size, downloaded,speed, percentage ,date):        
         if filename in self.file_widgets:
             self.file_widgets[filename].update_widget(filename, status,size, downloaded, date, speed, percentage)
+            if 'Finished' in status :
+                self.show_less_popup.download_completed()
+            elif "failed" in status.lower():
+                self.show_less_popup.download_failed()
         else:
             self.add_new_file_widget(filename, status, size, date)
+
+        
 
     def add_new_file_widget(self, filename, status, size, date): 
         path = self.xengine_downloads[filename]['path']     
@@ -326,11 +334,6 @@ class MainApplication(QMainWindow):
                     self.add_new_file_widget(filename, detail['status'], detail['filesize'], detail['modification_date'])
 
 
-    
-     
-               
-
-    
     # File operations
     def pause_downloading_file(self, filename_with_path):
         f_name = os.path.basename(filename_with_path)
@@ -341,18 +344,13 @@ class MainApplication(QMainWindow):
                 link = details['url']
                 downloaded = details['downloaded']           
                 #asyncio.run_coroutine_threadsafe(self.task_manager.pause_downloads_fn(filename_with_path, size, link ,downloaded), self.task_manager.loop)
-                if f_name in self.progress_toplevels:                  
-                    
-                    del self.progress_toplevels[f_name]
-
-
+                
     def resume_paused_file(self, filename_with_path):
         def safe_int(value):
             try:
                 return int(value)
             except ValueError:
-                return 0
-            
+                return 0    
         f_name = os.path.basename(filename_with_path) 
         self.load_downloads_from_db()## reasign values to xengine_downloads to get updated values for downloaded chuck
         self.downloaded_chuck = 0
@@ -372,8 +370,7 @@ class MainApplication(QMainWindow):
             value = self.xengine_downloads.pop(pathless_old_name)
 
             self.xengine_downloads[pathless_new_name] = value
-                
-                
+                      
         if pathless_old_name in self.file_widgets:
             value = self.file_widgets.pop(pathless_old_name) 
 
@@ -384,20 +381,13 @@ class MainApplication(QMainWindow):
             if file_widget.isVisible():
                 file_widget.update_filename(new_name)
 
-        
-
-
     def return_all_downloads(self):
         return self.xengine_downloads
     
-    
-    def delete_complete_download(self):
-            
+    def delete_complete_download(self):            
         completed_files = [filename for filename, detail in self.return_all_downloads().items() if detail['status'] == 'completed.']
-
         for filename in completed_files:
-            del self.xengine_downloads[filename]
-       
+            del self.xengine_downloads[filename]       
         storage.clear_download_finished()
    
     def delete_details_or_make_changes(self, filename):        
@@ -410,7 +400,7 @@ class MainApplication(QMainWindow):
     def clear_displayed_files_widgets(self):
         for widget in self.file_widgets.items():
             pass
-            #widget.destroy()
+           
         self.file_widgets = {}
         
           
@@ -431,10 +421,6 @@ class TopBar(QFrame):
         separator.setFrameShape(QFrame.Shape.HLine)        
         separator.setStyleSheet("color : #e2e7eb;")  # Set to black
         separator.setLineWidth(1)  #
-
-        
-        
-
         navigation_layout = QHBoxLayout() 
         open_linkbox_btn = QPushButton(QIcon(self.other_methods.resource_path('images/link-outline.png')), "") 
         open_linkbox_btn.setObjectName('open_linkbox_btn') 
@@ -455,14 +441,10 @@ class TopBar(QFrame):
         navigation_layout.setContentsMargins(0, 0, 0, 0)
         navigation_layout.setAlignment(Qt.AlignmentFlag.AlignRight)
         main_layout.addWidget(separator)  
-
-    def filter_all_downloads(self):        
-        pass
-    def filter_complete_downloads(self):        
-        pass      
+    
 
     def open_link_box(self):       
-        self.app.add_link_top_window = AddLink(task_manager=self.task_manager)
+        self.app.add_link_top_window = AddLink(app=self.app, task_manager=self.task_manager)
         self.app.add_link_top_window.show()   
         pass
 
@@ -494,12 +476,7 @@ class BottomBar(QFrame):
         layout.addWidget(btn)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-class FileListOrderLabel():
-    def __init__(self, master, app):
-        super().__init__(master, fg_color='transparent', height=20)
-        self.create_widgets()
-    def create_widgets(self):
-        pass
+
 
 class ContentArea(QFrame):
     def __init__(self):
@@ -513,9 +490,7 @@ class ContentArea(QFrame):
         self.setObjectName("content-container")
         self.setLayout(self.content_area)
         
-    def show_more_popup(self):
-        pass
-        
+    
 
 class Sidebar(QFrame):
     def __init__(self, app):
@@ -904,19 +879,54 @@ class CustomTitleBar(QFrame):
         
         
         # Add spacer to push the buttons to the right
-        layout.addStretch()
+        
 
-        self.more_btn = QPushButton(QIcon(self.other_methods.resource_path('images/menu-outline.png')), "")
-        self.more_btn.setIconSize(QSize(13, 13))
+        self.more_btn = QPushButton()
+        
         self.more_btn.setStyleSheet("""
+             QPushButton::menu-indicator {
+                image: none;  /* Hide the dropdown arrow */
+                padding: 0;
+                icon : none;
+                margin: 0;
+                height : 0;
+                width: 0;
+            }
             QPushButton{
                 background-color: transparent;
+                margin-left: 10px;
+                padding: 0 5px;
             }
             QPushButton:hover{
-                icon : url('images/menu-filled.png')                
+                icon : url('images/menu-filled.png') 
+                           
             }
+           
         """)
+
+        # Create the dropdown menu
+        self.menu = QMenu(self)
+        #self.menu.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        
+        # Add menu items with icons
+        add_action = self.menu.addAction(QIcon("images/add-link.png"), "Add Multiple Links")
+        clear_action = self.menu.addAction(QIcon("images/clean.png"), "Clear Finished")
+        delete_action = self.menu.addAction(QIcon("images/remove.png"), "Delete Selected")
+
+        
+
+        add_action.triggered.connect(self.add_links)
+        clear_action.triggered.connect(self.clear_finished)
+        delete_action.triggered.connect(self.delete_selected)
+       
+
+        # Set the menu for the dropdown button
+        self.more_btn.setMenu(self.menu)
+        self.more_btn.setIcon(QIcon(self.other_methods.resource_path('images/menu-outline.png')),)
+        self.more_btn.setIconSize(QSize(13, 13))
         layout.addWidget(self.more_btn)
+
+        layout.addStretch()
 
         # Minimize button
         self.minimize_button = QPushButton(QIcon(self.other_methods.resource_path('images/minus.png')), "")
@@ -946,6 +956,7 @@ class CustomTitleBar(QFrame):
             *{
                 background-color: #e2e7eb;                          
             }
+            
             #navigation-btn{
                 background-color: transparent;
             }
@@ -966,9 +977,35 @@ class CustomTitleBar(QFrame):
             #window-close:hover{
                 background-color: red;
             }
+            
 
         """)
-
+        self.menu.setStyleSheet("""
+            QMenu {
+                width: 200px;
+                padding: 5px;
+                height: 150px;
+                border-radius: 5px;
+                background-color: #48D1CC;
+            }
+            QMenu::item {
+                padding: 5px 20px 5px 25px;
+                border-radius: 5px;
+                width: 145px;
+                height: 25px;
+                background-color:  #e6e6e6;
+                margin-bottom: 10px;
+               
+            }
+            QMenu::item:selected {
+                background-color: #e2e7eb;
+            }
+            QMenu::icon {
+                position: absolute;
+                left: 10px;
+                top: 5px;
+            }
+        """)
     def minimize_window(self):
         self.parent.showMinimized()
 
@@ -997,5 +1034,14 @@ class CustomTitleBar(QFrame):
         delta = QPoint(event.globalPosition().toPoint() - self.old_pos)
         self.parent.move(self.parent.x() + delta.x(), self.parent.y() + delta.y())
         self.old_pos = event.globalPosition().toPoint()
+
+    def add_links(self):
+        print("Add Links selected")
+
+    def clear_finished(self):
+        print("Clear Finished selected")
+
+    def delete_selected(self):
+        print("Delete Selected selected")
 
 
