@@ -189,7 +189,7 @@ class OtherMethods():
         else: return 'document'
 
 
-    def resource_path(self,relative_path):
+    def resource_path(self, relative_path):
         """ Get absolute path to resource, works for dev and for PyInstaller """
         try:
             # PyInstaller creates a temp folder and stores path in _MEIPASS
@@ -197,8 +197,9 @@ class OtherMethods():
         except Exception:
             base_path = os.path.abspath(".")
 
-        return os.path.join(base_path, relative_path)
-    
+        # Join the base path and relative path, then normalize the result
+        return os.path.normpath(os.path.join(base_path, relative_path))
+        
 
     content_type_to_extension = {
             # Text types

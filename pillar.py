@@ -33,7 +33,7 @@ class MainApplication(QMainWindow):
 
     def setup_window(self):
         self.setWindowTitle('VenaApp')
-        self.setWindowIcon(QIcon('images/main.ico'))
+        self.setWindowIcon(QIcon(self.other_methods.resource_path('images/main.ico')))
         self.setGeometry(100, 100, 800, 540)
         self.center_window()
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
@@ -419,7 +419,8 @@ class TopBar(QFrame):
     def __init__(self, app):
         super().__init__()  
         self.app = app  
-        self.task_manager = app.task_manager   
+        self.task_manager = app.task_manager 
+        self.other_methods = OtherMethods()  
         self.create_widgets()
         
     def create_widgets(self):
@@ -435,14 +436,14 @@ class TopBar(QFrame):
         
 
         navigation_layout = QHBoxLayout() 
-        open_linkbox_btn = QPushButton(QIcon('images/link-outline.png'), "") 
+        open_linkbox_btn = QPushButton(QIcon(self.other_methods.resource_path('images/link-outline.png')), "") 
         open_linkbox_btn.setObjectName('open_linkbox_btn') 
         open_linkbox_btn.clicked.connect(self.open_link_box)
 
-        active_btn = QPushButton(QIcon('images/active.png'), ' Active')
+        active_btn = QPushButton(QIcon(self.other_methods.resource_path('images/active.png')), ' Active')
         active_btn.setIconSize(QSize(12, 12))
         active_btn.setObjectName('active-btn')       
-        downloaded_btn = QPushButton(QIcon('images/complete.png'),' Downloaded')
+        downloaded_btn = QPushButton(QIcon(self.other_methods.resource_path('images/complete.png')),' Downloaded')
         downloaded_btn.setIconSize(QSize(12, 12))
         downloaded_btn.setObjectName('downloaded-btn')
         main_layout.addLayout(navigation_layout)
@@ -467,7 +468,8 @@ class TopBar(QFrame):
 
 class BottomBar(QFrame):
     def __init__(self):
-        super().__init__() 
+        super().__init__()
+        self.other_methods = OtherMethods() 
         self.setObjectName('bottombar')
         main_layout = QVBoxLayout()
         main_layout.setContentsMargins(0, 0, 0, 0)
@@ -487,7 +489,7 @@ class BottomBar(QFrame):
         self.add_icon_button_to_actions_bar(navigation_layout2, "images/refresh-outline.png", "Restart")
 
     def add_icon_button_to_actions_bar(self, layout, icon_path, text):
-        btn = QPushButton(QIcon(icon_path), "")
+        btn = QPushButton(QIcon(self.other_methods.resource_path(icon_path)), "")
         btn.setObjectName(f'{text}-btn')
         layout.addWidget(btn)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -520,6 +522,7 @@ class Sidebar(QFrame):
         super().__init__()    
         self.main_app = app
         self.buttons = []
+        self.other_methods = OtherMethods()
         self.create_widgets()
 
         self.setStyleSheet("""
@@ -536,7 +539,7 @@ class Sidebar(QFrame):
         """)
 
     def add_icon_button(self, layout, icon_paths, text, index):
-        btn = QPushButton(QIcon(icon_paths['outline']), "")
+        btn = QPushButton(QIcon(self.other_methods.resource_path(icon_paths['outline'])), "")
         btn.setObjectName(f'{text}-btn')
         btn.clicked.connect(lambda: self.main_app.switch_page(index))
         layout.addWidget(btn)
@@ -559,14 +562,14 @@ class Sidebar(QFrame):
     def update_button_styles(self, active_index):
         for i, (btn, icon_paths) in enumerate(self.buttons):
             if i == active_index:
-                btn.setIcon(QIcon(icon_paths['filled']))
+                btn.setIcon(QIcon(self.other_methods.resource_path(icon_paths['filled'])))
                 btn.setStyleSheet("""
                     QPushButton {
                         background-color: white;
                     }
                 """)
             else:
-                btn.setIcon(QIcon(icon_paths['outline']))
+                btn.setIcon(QIcon(self.other_methods.resource_path(icon_paths['outline'])))
                 btn.setStyleSheet(f"""
                     QPushButton {{
                         background-color: #e2e7eb;
@@ -616,7 +619,7 @@ class FileItemWidget(QFrame):
         self.icon_label = QLabel()
         self.icon_label.setObjectName('icon-label')
         self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.icon_label.setPixmap(QIcon(self.image).pixmap(20, 20))
+        self.icon_label.setPixmap(QIcon(self.other_methods.resource_path(self.image)).pixmap(20, 20))
 
         main_layout.addWidget(self.icon_label)        
 
@@ -768,7 +771,7 @@ class FileItemWidget(QFrame):
         new_name = os.path.basename(new_name)
         self.filename_label.setText(new_name)
         self.image = self.other_methods.return_file_type(new_name)
-        self.icon_label.setPixmap(QIcon(self.image).pixmap(20, 20))
+        self.icon_label.setPixmap(QIcon(self.other_methods.resource_path(self.image)).pixmap(20, 20))
 
     def apply_font(self, widget, family,size, italic = False, bold=False, underline=False):
         font = QFont(family, size)
@@ -851,28 +854,28 @@ class CustomTitleBar(QFrame):
         
         self.setFixedHeight(40)
         
-        
+        self.other_methods = OtherMethods()
         # Create the layout for the title bar
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         
         # Window icon
         self.window_icon = QLabel()
-        self.window_icon.setPixmap(QIcon('images/main.ico').pixmap(24, 24))
+        self.window_icon.setPixmap(QIcon(self.other_methods.resource_path('images/main.ico')).pixmap(24, 24))
         self.window_icon.setStyleSheet("background-color: transparent; margin: 0 15px;")
 
 
         layout.addWidget(self.window_icon)
 
-        self.back_btn = QPushButton(QIcon('images/left-chevron-dull.png'), "")
+        self.back_btn = QPushButton(QIcon(self.other_methods.resource_path('images/left-chevron-dull.png')), "")
         self.back_btn.setObjectName("navigation-btn")
-        self.forward_btn = QPushButton(QIcon('images/chevron-right-dull.png'), "")
+        self.forward_btn = QPushButton(QIcon(self.other_methods.resource_path('images/chevron-right-dull.png')), "")
         self.forward_btn.setObjectName("navigation-btn")
 
         layout.addWidget(self.back_btn)
         layout.addWidget(self.forward_btn)
 
-        search_action = QAction(QIcon('images/search.png'), "", self)
+        search_action = QAction(QIcon(self.other_methods.resource_path('images/search.png')), "", self)
         text_input = QLineEdit()
         text_input.addAction(search_action)
         
@@ -903,7 +906,7 @@ class CustomTitleBar(QFrame):
         # Add spacer to push the buttons to the right
         layout.addStretch()
 
-        self.more_btn = QPushButton(QIcon('images/menu-outline.png'), "")
+        self.more_btn = QPushButton(QIcon(self.other_methods.resource_path('images/menu-outline.png')), "")
         self.more_btn.setIconSize(QSize(13, 13))
         self.more_btn.setStyleSheet("""
             QPushButton{
@@ -916,7 +919,7 @@ class CustomTitleBar(QFrame):
         layout.addWidget(self.more_btn)
 
         # Minimize button
-        self.minimize_button = QPushButton(QIcon('images/minus.png'), "")
+        self.minimize_button = QPushButton(QIcon(self.other_methods.resource_path('images/minus.png')), "")
         self.minimize_button.setIconSize(QSize(14, 14))
         self.minimize_button.setObjectName('window-maxi-min')
         self.minimize_button.setFixedSize(40, 40)
@@ -924,7 +927,7 @@ class CustomTitleBar(QFrame):
         layout.addWidget(self.minimize_button)
         
         # Maximize button
-        self.maximize_button = QPushButton(QIcon('images/maximize.png'), "")
+        self.maximize_button = QPushButton(QIcon(self.other_methods.resource_path('images/maximize.png')), "")
         self.maximize_button.setIconSize(QSize(13, 13))
         self.maximize_button.setObjectName('window-maxi-min')
         self.maximize_button.setFixedSize(40, 40)
@@ -932,7 +935,7 @@ class CustomTitleBar(QFrame):
         layout.addWidget(self.maximize_button)
         
         # Close button
-        self.close_button = QPushButton(QIcon('images/close.png'), "")
+        self.close_button = QPushButton(QIcon(self.other_methods.resource_path('images/close.png')), "")
         self.close_button.setIconSize(QSize(11, 11))
         self.close_button.setObjectName('window-close')
         self.close_button.setFixedSize(40, 40)
@@ -973,13 +976,13 @@ class CustomTitleBar(QFrame):
         if not self.is_maximized:
             self.parent.showMaximized()
             self.is_maximized = True
-            self.maximize_button.setIcon(QIcon('images/squares.png'))
+            self.maximize_button.setIcon(QIcon(self.other_methods.resource_path('images/squares.png')))
             self.maximize_button.setIconSize(QSize(12, 12))
         
         else:
             self.parent.showNormal()
             self.is_maximized = False
-            self.maximize_button.setIcon(QIcon('images/maximize.png'))
+            self.maximize_button.setIcon(QIcon(self.other_methods.resource_path('images/maximize.png')))
             self.maximize_button.setIconSize(QSize(13, 13))
 
     def close_window(self):
