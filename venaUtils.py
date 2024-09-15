@@ -204,7 +204,7 @@ class OtherMethods():
             return "image"
         else: return 'document'
 
-    def add_shadow_effect(widget):
+    def add_shadow_effect(self, widget):
         hwnd = widget.winId().__int__()  # Get window handle
         margins = ctypes.windll.dwmapi.MARGINS(-1, -1, -1, -1)  # Set margins to extend the frame
         ctypes.windll.dwmapi.DwmExtendFrameIntoClientArea(hwnd, ctypes.byref(margins))
