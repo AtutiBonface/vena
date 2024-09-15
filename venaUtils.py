@@ -2,6 +2,20 @@ from PIL import Image
 from pathlib import Path
 import os, sys, logging
 from urllib.parse import urljoin, urlparse, urlunparse 
+import ctypes, platform
+
+# Constants for Windows 11 rounded corners
+DWMWA_WINDOW_CORNER_PREFERENCE = 33
+DWMNCRP_ROUNDSMALL = 2
+
+# Function to apply rounded corners
+def set_rounded_corners(widget):
+    hwnd = int(widget.winId())  # Get window handle
+    # Apply rounded corners preference using the Windows API
+    ctypes.windll.dwmapi.DwmSetWindowAttribute(
+        hwnd, DWMWA_WINDOW_CORNER_PREFERENCE,
+        ctypes.byref(ctypes.c_int(DWMNCRP_ROUNDSMALL)), ctypes.sizeof(ctypes.c_int)
+    )
 
 class Images():
     def resource_path(self, relative_path):
@@ -189,8 +203,23 @@ class OtherMethods():
         elif extension in self.image_extensions:
             return "image"
         else: return 'document'
+    def is_windows_11(self):
+    # Check if the system is running Windows 11 by looking at the release version
+        return platform.system() == "Windows" and int(platform.version().split('.')[2]) >= 22000
 
+    DWMWA_WINDOW_CORNER_PREFERENCE = 33
+    DWMNCRP_ROUNDSMALL = 2
 
+    # Function to apply rounded corners
+    def set_rounded_corners(self, widget):
+        if self.is_windows_11(): 
+            hwnd = widget.winId().__int__()  # Get window handle
+            DWMWA_WINDOW_CORNER_PREFERENCE = 33
+            DWMNCRP_ROUNDSMALL = 2
+            ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                hwnd, DWMWA_WINDOW_CORNER_PREFERENCE,
+                ctypes.byref(ctypes.c_int(DWMNCRP_ROUNDSMALL)), ctypes.sizeof(ctypes.c_int)
+            )
     def resource_path(self, relative_path):
         """ Get absolute path to resource, works for dev and for PyInstaller """
         try:

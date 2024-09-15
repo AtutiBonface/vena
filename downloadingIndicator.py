@@ -1,13 +1,14 @@
 from PyQt6.QtWidgets import QWidget, QLabel,QVBoxLayout,QPushButton, QHBoxLayout, QApplication, QFrame
 from PyQt6.QtCore import Qt, QRect, QTimer, QSize, QPoint
 from PyQt6.QtGui import QPainter, QPen, QColor, QIcon,  QFont
-import time
+from venaUtils import OtherMethods
 
 
 class CircularProgress(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.progress = 0
+        self.other_methods = OtherMethods()
         self.setFixedSize(100, 100)
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_progress)
@@ -74,7 +75,7 @@ class DownloadIndicator(QWidget):
         expand_app_button.setObjectName("expand-btn")
         close_button.setObjectName("close-btn")
         close_button.clicked.connect(self.close_window)
-        title_bar.setMaximumHeight(13)
+        title_bar.setMaximumHeight(15)
         title_bar_layout.setSpacing(0)
 
         title_bar_layout.addWidget(network_button)

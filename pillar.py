@@ -27,6 +27,7 @@ class MainApplication(QMainWindow):
         self.setup_styles()
         self.create_widgets()
         self.setup_layout()
+        self.other_methods.set_rounded_corners(self)
         self.start_background_tasks()
         self.display_all_downloads_on_page()
         
@@ -52,6 +53,7 @@ class MainApplication(QMainWindow):
         self.other_methods = OtherMethods()
         self.update_queue = queue.Queue()
         self.show_less_popup = DownloadIndicator(self)
+        self.other_methods.set_rounded_corners(self.show_less_popup)
         self.previously_clicked_btn = None
         self.details_of_file_clicked = None
         self.running_tasks = {}
