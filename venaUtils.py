@@ -203,16 +203,22 @@ class OtherMethods():
         elif extension in self.image_extensions:
             return "image"
         else: return 'document'
-    def is_windows(self):
+
+    def add_shadow_effect(widget):
+        hwnd = widget.winId().__int__()  # Get window handle
+        margins = ctypes.windll.dwmapi.MARGINS(-1, -1, -1, -1)  # Set margins to extend the frame
+        ctypes.windll.dwmapi.DwmExtendFrameIntoClientArea(hwnd, ctypes.byref(margins))
+
+    def is_windows_11(self):
     # Check if the system is running Windows 11 by looking at the release version
-        return platform.system() == "Windows"
+        return platform.system() == "Windows" and int(platform.version().split('.')[2]) >= 22000
 
     DWMWA_WINDOW_CORNER_PREFERENCE = 33
     DWMNCRP_ROUNDSMALL = 2
 
     # Function to apply rounded corners
     def set_rounded_corners(self, widget):
-        if self.is_windows(): 
+        if self.is_windows_11(): 
             hwnd = widget.winId().__int__()  # Get window handle
             DWMWA_WINDOW_CORNER_PREFERENCE = 33
             DWMNCRP_ROUNDSMALL = 2
@@ -220,6 +226,8 @@ class OtherMethods():
                 hwnd, DWMWA_WINDOW_CORNER_PREFERENCE,
                 ctypes.byref(ctypes.c_int(DWMNCRP_ROUNDSMALL)), ctypes.sizeof(ctypes.c_int)
             )
+        else:
+            self.add_shadow_effect(widget)
     def resource_path(self, relative_path):
         """ Get absolute path to resource, works for dev and for PyInstaller """
         try:
