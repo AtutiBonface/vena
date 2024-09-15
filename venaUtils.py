@@ -206,7 +206,8 @@ class OtherMethods():
 
     def add_shadow_effect(self, widget):
         hwnd = widget.winId().__int__()  # Get window handle
-        margins = ctypes.windll.dwmapi.MARGINS(-1, -1, -1, -1)  # Set margins to extend the frame
+        # Create a MARGINS structure with -1 for all sides (this enables shadows)
+        margins = MARGINS(-1, -1, -1, -1)
         ctypes.windll.dwmapi.DwmExtendFrameIntoClientArea(hwnd, ctypes.byref(margins))
 
     def is_windows_11(self):
@@ -428,7 +429,11 @@ class OtherMethods():
             
         """
             
-
+class MARGINS(ctypes.Structure):
+    _fields_ = [("cxLeftWidth", ctypes.c_int),
+                ("cxRightWidth", ctypes.c_int),
+                ("cyTopHeight", ctypes.c_int),
+                ("cyBottomHeight", ctypes.c_int)]
             
 
                 
