@@ -203,16 +203,16 @@ class OtherMethods():
         elif extension in self.image_extensions:
             return "image"
         else: return 'document'
-    def is_windows_11(self):
+    def is_windows(self):
     # Check if the system is running Windows 11 by looking at the release version
-        return platform.system() == "Windows" and int(platform.version().split('.')[2]) >= 22000
+        return platform.system() == "Windows"
 
     DWMWA_WINDOW_CORNER_PREFERENCE = 33
     DWMNCRP_ROUNDSMALL = 2
 
     # Function to apply rounded corners
     def set_rounded_corners(self, widget):
-        if self.is_windows_11(): 
+        if self.is_windows(): 
             hwnd = widget.winId().__int__()  # Get window handle
             DWMWA_WINDOW_CORNER_PREFERENCE = 33
             DWMNCRP_ROUNDSMALL = 2
