@@ -693,7 +693,7 @@ class CompleteFileList(QScrollArea):
         self.scroll_widget.setStyleSheet('background-color: transparent;')
         self.file_layout = QVBoxLayout(self.scroll_widget)
         self.file_layout.setAlignment(Qt.AlignmentFlag.AlignTop)     
-        self.display_complete_downloads_on_page()
+        self.display_complete_downloads()
         self.setWidget(self.scroll_widget)
         self.setWidgetResizable(True)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded) 
