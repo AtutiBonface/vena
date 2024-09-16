@@ -362,16 +362,6 @@ class OtherMethods():
                 
             }
             
-            #active-btn, #downloaded-btn{
-                background-color: #e2e7eb;
-                width: 110px;
-                height: 30px;
-                border-radius: 5px;
-                margin: 5px 5px 0  0;
-            }
-            #active-btn{
-                background-color: #48D1CC;
-            }
             #open_linkbox_btn{
                 width: 40px;
                 height: 30px;

@@ -1,4 +1,4 @@
-import os,  asyncio , websockets, threading , json
+import os,  asyncio , websockets, json, subprocess, platform
 from venaUtils import OtherMethods, Colors, Images
 import storage, queue
 from PyQt6.QtWidgets import (
@@ -14,6 +14,7 @@ from downloadingIndicator import DownloadIndicator
 from taskManager import TaskManager
 from settingsPage  import SettingsWindow
 from aboutPage import AboutWindow
+from fileNotFound_plus import DeletionConfirmationWindow, FileNotFoundDialog
 
 
 
@@ -29,7 +30,7 @@ class MainApplication(QMainWindow):
         self.setup_layout()
         self.other_methods.set_rounded_corners(self)
         self.start_background_tasks()
-        self.display_all_downloads_on_page()
+        
         
 
     def setup_window(self):
@@ -68,7 +69,7 @@ class MainApplication(QMainWindow):
         self.create_sidebar()
         self.create_content_area()
         self.create_file_list()
-        self.create_file_list_order_labels()
+        self.create_complete_filelist()
         self.create_bottom_bar()
         self.create_top_bar()
         self.create_pages()
@@ -98,8 +99,12 @@ class MainApplication(QMainWindow):
         self.stacked_widget.addWidget(self.settings_page)
 
     def setup_layout(self):
+        self.file_list_stacked_widget = QStackedWidget()
+        self.file_list_stacked_widget.addWidget(self.complete_file_list)
+        self.file_list_stacked_widget.addWidget(self.file_list)
+
         self.content_area.content_area.addWidget(self.topbar)
-        self.content_area.content_area.addWidget(self.file_list)
+        self.content_area.content_area.addWidget(self.file_list_stacked_widget)
         self.content_area.content_area.addWidget(self.bottom_bar)
         self.body_layout.addWidget(self.sidebar)
         self.body_layout.addWidget(self.stacked_widget, 1)
@@ -107,6 +112,11 @@ class MainApplication(QMainWindow):
     def switch_page(self, index):
         self.stacked_widget.setCurrentIndex(index)
         self.sidebar.update_button_styles(index)
+
+    def switch_filelist_page(self, index):
+        self.file_list_stacked_widget.setCurrentIndex(index)
+        self.topbar.update_button_styles(index)
+
 
     
     
@@ -162,14 +172,16 @@ class MainApplication(QMainWindow):
     # Top bar related methods
     def create_top_bar(self):          
         self.topbar = TopBar(self)
-    def create_file_list_order_labels(self):
-        pass
+    
     # File list related methods
     def create_file_list(self):
-        self.file_list = FileList()
+        self.file_list = ActiveFileList(self)
+
+    def create_complete_filelist(self):
+        self.complete_file_list = CompleteFileList(self)
         
     def create_bottom_bar(self):
-        self.bottom_bar = BottomBar()
+        self.bottom_bar = BottomBar(self)
 
     def center_window(self):
         # Get the screen's geometry (size and position)
@@ -309,6 +321,7 @@ class MainApplication(QMainWindow):
     
     def display_all_downloads_on_page(self):
         for filename, detail in self.return_all_downloads().items():
+           
             file_item = FileItemWidget(
                 app = self,
                 filename=f"{filename}",
@@ -319,7 +332,8 @@ class MainApplication(QMainWindow):
                 status=detail['status'],
                 percentage= detail['percentage'],
                 speed=" "
-            )           
+            ) 
+            self.file_widgets[filename] =file_item          
             self.file_list.file_layout.addWidget(file_item)
            
 
@@ -392,12 +406,18 @@ class MainApplication(QMainWindow):
             del self.xengine_downloads[filename]       
         storage.clear_download_finished()
    
-    def delete_details_or_make_changes(self, filename):        
+    def delete_details_or_make_changes(self, filename):      
         storage.delete_individual_file(filename)## delete from storage       
         self.remove_individual_file_widget(filename) ## destroy widget
 
-    def remove_individual_file_widget(self, filename):   
-       pass
+    def remove_individual_file_widget(self, filename):  
+        widget = self.file_widgets[filename]         
+        self.file_list.file_layout.removeWidget(widget)
+        widget.hide()
+        self.previously_clicked_btn = None
+        self.details_of_file_clicked = None
+       
+       
 
     def clear_displayed_files_widgets(self):
         for widget in self.file_widgets.items():
@@ -413,7 +433,19 @@ class TopBar(QFrame):
         self.app = app  
         self.task_manager = app.task_manager 
         self.other_methods = OtherMethods()  
+        self.buttons = []
         self.create_widgets()
+        self.setStyleSheet("""
+            #active-btn, #downloaded-btn{
+                background-color: #e2e7eb;
+                width: 110px;
+                height: 30px;
+                border-radius: 5px;
+                margin: 5px 5px 0  0;
+            }
+           
+
+        """)
         
     def create_widgets(self):
         self.setObjectName('topbar')
@@ -427,34 +459,58 @@ class TopBar(QFrame):
         open_linkbox_btn = QPushButton(QIcon(self.other_methods.resource_path('images/link-outline.png')), "") 
         open_linkbox_btn.setObjectName('open_linkbox_btn') 
         open_linkbox_btn.clicked.connect(self.open_link_box)
-
-        active_btn = QPushButton(QIcon(self.other_methods.resource_path('images/active.png')), ' Active')
-        active_btn.setIconSize(QSize(12, 12))
-        active_btn.setObjectName('active-btn')       
-        downloaded_btn = QPushButton(QIcon(self.other_methods.resource_path('images/complete.png')),' Downloaded')
-        downloaded_btn.setIconSize(QSize(12, 12))
-        downloaded_btn.setObjectName('downloaded-btn')
+        
         main_layout.addLayout(navigation_layout)
         self.setLayout(main_layout)
         navigation_layout.addWidget(open_linkbox_btn)
         navigation_layout.addStretch()
-        navigation_layout.addWidget(active_btn)
-        navigation_layout.addWidget(downloaded_btn)
+        self.add_icon_button(navigation_layout, {"outline": "images/active.png", "filled": "images/inactive.png"}, "Active", 0)
+        self.add_icon_button(navigation_layout, {"outline": "images/complete-active.png", "filled": "images/complete.png"}, "Downloaded", 1)
         navigation_layout.setContentsMargins(0, 0, 0, 0)
         navigation_layout.setAlignment(Qt.AlignmentFlag.AlignRight)
         main_layout.addWidget(separator)  
+        self.update_button_styles(1)
     
 
     def open_link_box(self):       
         self.app.add_link_top_window = AddLink(app=self.app, task_manager=self.task_manager)
-        self.app.add_link_top_window.show()   
-        pass
+        self.app.add_link_top_window.show() 
+
+    def add_icon_button(self, layout, icon_paths, text, index):
+        btn = QPushButton(QIcon(self.other_methods.resource_path(icon_paths['outline'])), f" {text}")
+        btn.setObjectName(f'{text.lower()}-btn')
+        btn.setIconSize(QSize(12, 12))
+        btn.clicked.connect(lambda: self.app.switch_filelist_page(index))
+        layout.addWidget(btn)
+        self.buttons.append((btn, icon_paths))
+        return btn  
+
+    def update_button_styles(self, active_index):
+        for i, (btn, icon_paths) in enumerate(self.buttons):
+            if i == active_index:
+                btn.setIcon(QIcon(self.other_methods.resource_path(icon_paths['outline'])))
+                btn.setStyleSheet("""
+                    QPushButton {
+                       background-color: #48D1CC;
+                    }
+                """)
+            else:
+                btn.setIcon(QIcon(self.other_methods.resource_path(icon_paths['filled'])))
+                btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: #e2e7eb;
+                    }
+                    
+                """)
 
 class BottomBar(QFrame):
-    def __init__(self):
+    def __init__(self, app):
         super().__init__()
         self.other_methods = OtherMethods() 
+        self.app = app
         self.setObjectName('bottombar')
+        #app.previously_clicked_btn = None
+        #app.details_of_file_clicked = None
         main_layout = QVBoxLayout()
         main_layout.setContentsMargins(0, 0, 0, 0)
         separator = QFrame()
@@ -475,8 +531,43 @@ class BottomBar(QFrame):
     def add_icon_button_to_actions_bar(self, layout, icon_path, text):
         btn = QPushButton(QIcon(self.other_methods.resource_path(icon_path)), "")
         btn.setObjectName(f'{text}-btn')
+        btn.clicked.connect(lambda : self.do_action(text))
         layout.addWidget(btn)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+
+    def do_action(self, text):
+        if self.app.details_of_file_clicked:
+            f_name , path = self.app.details_of_file_clicked 
+            path_and_file = os.path.join(path, f_name)
+            if text.strip() == 'Open':
+                if not os.path.exists(path_and_file):
+                    self.file_not_found_popup = FileNotFoundDialog(self.app, f_name)
+                    self.file_not_found_popup.show()
+                        
+                else:
+                    system_name = platform.system()   
+                
+                    if system_name == 'Windows':
+                        os.startfile(path_and_file)
+
+                    elif system_name == 'Linux':
+                        subprocess.Popen(["xdg-open", path_and_file])
+                pass ## open file
+            elif text.strip() == 'Delete':              
+
+                file_to_delete = os.path.join(path, f_name)
+                self.confirm = DeletionConfirmationWindow(self.app, f_name, file_to_delete)
+                self.confirm.show()
+                    
+            elif text.strip() == 'Pause':
+                pass ## pause downloading
+            elif text.strip() == 'Resume':
+                pass ## resume downloading
+            elif text.strip() == 'Restart':
+                pass ### restart donwload
+            
+       
 
 
 
@@ -559,28 +650,86 @@ class Sidebar(QFrame):
                     }}
                 """)
         
-class FileList(QScrollArea):
-    def __init__(self):
+class ActiveFileList(QScrollArea):
+    def __init__(self, app):
         super().__init__()       
         self.setObjectName('scroll-area')
+        self.app = app
         # Create a widget to contain the layout
         self.scroll_widget = QFrame()
         self.scroll_widget.setStyleSheet('background-color: transparent;')
-        self.file_layout = QVBoxLayout(self.scroll_widget)
-        self.file_layout.setAlignment(Qt.AlignmentFlag.AlignTop)     
-       
+        self.file_lay = QVBoxLayout(self.scroll_widget)
+        self.file_lay.setAlignment(Qt.AlignmentFlag.AlignTop)     
+        self.display_incomplete_downloads_on_page()
+
         self.setWidget(self.scroll_widget)
         self.setWidgetResizable(True)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded) 
 
+    def display_incomplete_downloads_on_page(self):
+        for filename, detail in self.app.return_all_downloads().items():
+            if 'finished' not in detail['status'].lower():
+                file_item = FileItemWidget(
+                    app = self.app,
+                    filename=f"{filename}",
+                    path = detail['path'],
+                    file_size=f"{detail['filesize']}",
+                    downloaded=f"{detail['downloaded']}",
+                    modified_date=f"{detail['modification_date']}",
+                    status=detail['status'],
+                    percentage= detail['percentage'],
+                    speed=" "
+                ) 
+                self.app.file_widgets[filename] = file_item          
+                self.file_lay.addWidget(file_item)
+
+class CompleteFileList(QScrollArea):
+    def __init__(self, app):
+        super().__init__()       
+        self.setObjectName('scroll-area')
+        self.app = app
+
+        self.scroll_widget = QFrame()
+        self.scroll_widget.setStyleSheet('background-color: transparent;')
+        self.file_layout = QVBoxLayout(self.scroll_widget)
+        self.file_layout.setAlignment(Qt.AlignmentFlag.AlignTop)     
+        self.display_complete_downloads_on_page()
+        self.setWidget(self.scroll_widget)
+        self.setWidgetResizable(True)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded) 
+      
+
 
         # Set the scrollable widget
-        
+    def display_complete_downloads(self):
+        for filename, detail in self.app.return_all_downloads().items():
+            if 'finished' in detail['status'].lower():
+                self.add_file_widget(filename, detail)
+
+    def add_file_widget(self, filename, detail):
+        if filename not in self.app.file_widgets:
+            file_item = FileItemWidget(
+                app=self.app,
+                filename=filename,
+                path=detail['path'],
+                file_size=detail['filesize'],
+                downloaded=detail['downloaded'],
+                modified_date=detail['modification_date'],
+                status=detail['status'],
+                percentage=detail['percentage'],
+                speed=" "
+            )
+            self.app.file_widgets[filename] = file_item
+            self.file_layout.addWidget(file_item)
+           
+
 
 class FileItemWidget(QFrame):
     def __init__(self,app, filename,path, file_size, downloaded,status, percentage, speed,modified_date):
         super().__init__()
         self.app = app
+
+        self.is_selected = False
         self.file_path = path
         self.filename  = filename
         self.other_methods = OtherMethods()       
@@ -646,6 +795,7 @@ class FileItemWidget(QFrame):
         self.apply_font(self.download_failed, 'Arial', 9, underline=True, italic=True)
         
         self.setLayout(main_layout)
+
         self.setStyleSheet("""
             FileItemWidget {
                 background-color: transparent;
@@ -681,69 +831,124 @@ class FileItemWidget(QFrame):
             
         """)
          
+
+
+
     def enterEvent(self, event):
         """Triggered when mouse enters the widget."""
-        self.setStyleSheet("""
-            FileItemWidget {
-                background-color: #e0e0e0;  /* Light gray background on hover */
-                border-radius: 5px;
-            }
-            #icon-label {
-                max-width: 40px;
-            }
-            #status{               
-                max-width: 150px;
-                color: grey;
-            }
-            #info{                
-                max-width: 150px;
-                color: grey;
-            }
-            #speed{               
-                max-width: 70px;
-                color: grey;
-            }
-            #retry{
-                max-width: 60px;
-                color: orange; 
-            }
-            #retry:hover{
-                color: #48D1CC; 
-            }
-        """)
+        if not self.is_selected:
+            self.setStyleSheet(self.get_hover_style())
         super().enterEvent(event)
-
     def leaveEvent(self, event):
         """Triggered when mouse leaves the widget."""
-        self.setStyleSheet("""
+        if not self.is_selected:
+            self.setStyleSheet(self.get_normal_style())
+        super().leaveEvent(event)
+    def mousePressEvent(self, event):
+        """Triggered when the widget is clicked."""
+        if self.app.previously_clicked_btn:
+            self.app.previously_clicked_btn.is_selected = False
+            self.app.previously_clicked_btn.setStyleSheet(self.get_normal_style())
+        
+        self.is_selected = True
+        self.setStyleSheet(self.get_selected_style())
+        self.app.previously_clicked_btn = self
+        self.app.details_of_file_clicked = (
+            self.filename,
+            self.file_path,
+            # Add other details as needed
+        )
+        super().mousePressEvent(event)
+    def get_normal_style(self):
+        return """
             FileItemWidget {
-                background-color: transparent;  /* Restore background on leave */
+                background-color: transparent;
                 border-radius: 5px;
             }
             #icon-label {
                 max-width: 40px;
             }
-            #status{
+            #status {
                 color: grey;
                 max-width: 150px;
             }
-            #info{
+            #info {
                 color: grey;
                 max-width: 150px;
             }
-            #speed{
+            #speed {
                 color: grey;
                 max-width: 70px;
             }
-            #retry{
+            #retry {
                 max-width: 60px;
-                color: orange; 
+                color: orange;
             }
-            #retry:hover{
-                color: #48D1CC; 
+            #retry:hover {
+                color: #48D1CC;
             }
-        """)
-        super().leaveEvent(event)
+        """
+
+    def get_hover_style(self):
+        return """
+            FileItemWidget {
+                background-color: #e0e0e0;
+                border-radius: 5px;
+            }
+            #icon-label {
+                max-width: 40px;
+            }
+            #status {
+                color: grey;
+                max-width: 150px;
+            }
+            #info {
+                color: grey;
+                max-width: 150px;
+            }
+            #speed {
+                color: grey;
+                max-width: 70px;
+            }
+            #retry {
+                max-width: 60px;
+                color: orange;
+            }
+            #retry:hover {
+                color: #48D1CC;
+            }
+        """
+
+    def get_selected_style(self):
+        return """
+            FileItemWidget {
+                background-color: #e2e7eb;
+                border-radius: 5px;
+            }
+            #icon-label {
+                max-width: 40px;
+            }
+            #status {
+                color: grey;
+                max-width: 150px;
+            }
+            #info {
+                color: grey;
+                max-width: 150px;
+            }
+            #speed {
+                color: grey;
+                max-width: 70px;
+            }
+            #retry {
+                max-width: 60px;
+                color: grey;
+            }
+            #retry:hover {
+                color: #e0e0e0;
+            }
+        """
+    
     def update_filename(self, new_name):
         new_name = os.path.basename(new_name)
         self.filename_label.setText(new_name)
@@ -786,43 +991,12 @@ class FileItemWidget(QFrame):
         # Update modified date
         self.modified_label.setText(modified_date)
 
-    def retry_downloading(self):
-        
+    def retry_downloading(self):        
         filename_with_path = os.path.join(self.file_path, self.filename )
         self.app.resume_paused_file(filename_with_path)
 
-    def mousePressEvent(self, event):
-        """Triggered when the widget is clicked."""
-        self.setStyleSheet("""
-            FileItemWidget {
-                background-color: #e2e7eb;  /* Darker gray on click */
-                border-radius: 5px;
-            }
-            #icon-label {
-                max-width: 40px;
-            }
-            #status{
-                color: grey;
-                max-width: 150px;
-            }
-            #info{
-                color: grey;
-                max-width: 150px;
-            }
-            #speed{
-                color: grey;
-                max-width: 70px;
-            }
-            #retry{
-                max-width: 60px;
-                color: orange; 
-            }
-            #retry:hover{
-                color: #48D1CC; 
-            }
-            
-        """)
-        super().mousePressEvent(event)
+
+    
 
 class CustomTitleBar(QFrame):
     def __init__(self, parent=None):

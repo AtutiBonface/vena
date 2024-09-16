@@ -1,60 +1,70 @@
 import sys
-from PyQt6.QtWidgets import QApplication, QMainWindow, QPushButton, QWidget, QVBoxLayout, QLabel
+from PyQt6.QtWidgets import QApplication, QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QIcon, QPixmap
 
-class MainWindow(QMainWindow):
-    def __init__(self):
+class FileNotFoundDialog(QDialog):
+    def __init__(self, file_name):
         super().__init__()
-        self.setWindowTitle("Main Application")
-        self.setGeometry(100, 100, 800, 600)
-        
-        # Create a button to open the secondary window
-        self.open_secondary_button = QPushButton("Open Secondary Window")
-        self.open_secondary_button.clicked.connect(self.open_secondary_window)
+        self.file_name = file_name
+        self.init_ui()
 
-        # Set the layout and central widget
-        layout = QVBoxLayout()
-        layout.addWidget(self.open_secondary_button)
-        central_widget = QWidget()
-        central_widget.setLayout(layout)
-        self.setCentralWidget(central_widget)
+    def init_ui(self):
+        self.setWindowTitle("File Not Found")
+        self.setWindowIcon(QIcon("images/failed.png"))  # Replace with your icon path
+        self.setFixedSize(400, 200)
 
-        # Initialize the secondary window
-        self.secondary_window = SecondaryWindow(self)
+        main_layout = QVBoxLayout()
 
-    def open_secondary_window(self):
-        self.secondary_window.show()
+        # Icon and message layout
+        icon_message_layout = QHBoxLayout()
 
-    def showEvent(self, event):
-        super().showEvent(event)
-        if self.secondary_window.isVisible():
-            self.secondary_window.show()
+        # Error icon
+        error_icon_label = QLabel()
+        error_pixmap = QPixmap("images/failed.png")  # Replace with your icon path
+        error_icon_label.setPixmap(error_pixmap.scaled(24, 24, Qt.AspectRatioMode.KeepAspectRatio))
+        error_icon_label.setMaximumSize(30, 30)
+        icon_message_layout.addWidget(error_icon_label)
 
+        # Error message
+        message_layout = QVBoxLayout()
+        error_label = QLabel("File Not Found")
+        error_label.setStyleSheet("font-weight: bold; font-size: 16px; color: #E74C3C;")
+        details_label = QLabel(f"The file '{self.file_name}' could not be found or may have been moved.")
+        details_label.setWordWrap(True)
+        message_layout.addWidget(error_label)
+        message_layout.addWidget(details_label)
+        icon_message_layout.addLayout(message_layout)
 
-class SecondaryWindow(QWidget):
-    def __init__(self, main_window):
-        super().__init__()
-        self.main_window = main_window
-        self.setWindowTitle("Secondary Window")
-        self.setGeometry(100, 100, 300, 200)
+        main_layout.addLayout(icon_message_layout)
 
-        # Create a button to restore the main window
-        self.restore_button = QPushButton("Restore Main Window")
-        self.restore_button.clicked.connect(self.restore_main_window)
+        # Buttons
+        button_layout = QHBoxLayout()
+        ok_button = QPushButton(QIcon('images/like.png')," OK")
+        ok_button.clicked.connect(self.accept)
+        button_layout.addStretch()
+        button_layout.addWidget(ok_button)
 
-        # Set the layout
-        layout = QVBoxLayout()
-        layout.addWidget(self.restore_button)
-        self.setLayout(layout)
+        main_layout.addStretch()
+        main_layout.addLayout(button_layout)
 
-    def restore_main_window(self):
-        if self.main_window.isMinimized():
-            self.main_window.showNormal()
-        self.main_window.activateWindow()
+        self.setLayout(main_layout)
 
+        self.setStyleSheet("""
+            FileNotFoundDialog{
+                background-color: #e2e7eb;
+            }
+            QPushButton{
+                background-color: #48D1CC;
+                width: 100px;
+                height: 30px;
+                border-radius: 5px;
+                margin: 5px 5px 0  0;
+            }
 
-if __name__ == "__main__":
+        """)
+
+if __name__ == '__main__':
     app = QApplication(sys.argv)
-    main_window = MainWindow()
-    main_window.show()
-    sys.exit(app.exec())
+    dialog = FileNotFoundDialog("Free 4K Stock Videos & Full HD Video Clips to Download.mp4")
+    dialog.exec()

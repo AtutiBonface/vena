@@ -1,65 +1,69 @@
 import sys
-from PyQt6.QtWidgets import QApplication, QMainWindow, QPushButton, QMenu, QWidget, QVBoxLayout
-from PyQt6.QtGui import QIcon
+from PyQt6.QtWidgets import QApplication, QDialog, QVBoxLayout, QHBoxLayout, QLabel, QCheckBox, QPushButton
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QIcon
 
-class MainWindow(QMainWindow):
-    def __init__(self):
+class DeletionConfirmationWindow(QDialog):
+    def __init__(self, file_name):
         super().__init__()
-        self.setWindowTitle("Dropdown Menu Example")
-        self.setGeometry(100, 100, 300, 200)
+        self.file_name = file_name
+        self.init_ui()
 
-        layout = QVBoxLayout()
-        container = QWidget()
-        container.setLayout(layout)
-        self.setCentralWidget(container)
+    def init_ui(self):
+        self.setWindowTitle("Confirm Deletion")
+        self.setWindowIcon(QIcon("delete_icon.png"))  # Replace with your icon path
+        self.setFixedSize(400, 200)
 
-        # Create the dropdown button
-        self.dropdown_button = QPushButton("Filter chats by")
+        main_layout = QVBoxLayout()
+
+        # Warning message
+        warning_label = QLabel(f"Are you sure you want to delete '{self.file_name}'?")
+        warning_label.setWordWrap(True)
+        warning_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        warning_label.setStyleSheet("font-weight: bold; color: #E74C3C;")
+        main_layout.addWidget(warning_label)
+
+        # Checkbox for deletion option
+        self.delete_storage_checkbox = QCheckBox("Also delete file from Device storage")
+        self.delete_storage_checkbox.setStyleSheet("margin: 10px 0;")
+        main_layout.addWidget(self.delete_storage_checkbox)
+
+        # Buttons
+        button_layout = QHBoxLayout()
+        cancel_button = QPushButton("Cancel")
+        cancel_button.clicked.connect(self.close)
+        delete_button = QPushButton("Delete")
+        delete_button.clicked.connect(self.confirm_deletion)
+        delete_button.setStyleSheet("background-color: #E74C3C; color: white;")
+
+        button_layout.addWidget(cancel_button)
+        button_layout.addWidget(delete_button)
+
+        main_layout.addLayout(button_layout)
+
+        self.setLayout(main_layout)
+
         self.setStyleSheet("""
-            QPushButton {
-                text-align: left;
-                padding: 5px;
-                border: 1px solid #ccc;
+            QPushButton{
+                height: 40px;
+                max-width : 120px;
+                border: none;
                 border-radius: 5px;
+                background-color: #48D1CC;
             }
-            QMenu {
-                width: 200px;
-                padding: 5px;
-                border-radius: 5px;
-            }
-            QMenu::item {
-                padding: 5px 5px 5px 5px;
-                border-radius: 3px;
-                width: 180px;
-            }
-            QMenu::item:selected {
-                background-color: #e6e6e6;
-            }
-            QMenu::icon {
-                position: absolute;
-                height: 15px;
-                width; 15PX;
-                left: 5px;
-                top: 5px;
-            }
+
         """)
-        layout.addWidget(self.dropdown_button)
 
-        # Create the dropdown menu
-        self.menu = QMenu(self)
-        
-        # Add menu items with icons
-        self.menu.addAction(QIcon("images/add-link.png"), "Add Links")
-        self.menu.addAction(QIcon("images/clean.png"), "Clear Finished")
-        self.menu.addAction(QIcon("images/remove.png"), "Delete Selected")
-       
+    def confirm_deletion(self):
+        delete_from_storage = self.delete_storage_checkbox.isChecked()
+        # Perform deletion logic here
+        print(f"Deleting '{self.file_name}' from database")
+        if delete_from_storage:
+            print(f"Also deleting '{self.file_name}' from storage")
+        self.close()
 
-        # Set the menu for the dropdown button
-        self.dropdown_button.setMenu(self.menu)
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     app = QApplication(sys.argv)
-    window = MainWindow()
+    window = DeletionConfirmationWindow("Free 4K Stock Videos & Full HD Video Clips to Download.mp4")
     window.show()
     sys.exit(app.exec())

@@ -51,6 +51,7 @@ class SegmentTracker:
 
 class SetAppTray():
     def __init__(self, app) -> None:
+        
         self.tray_icon = QSystemTrayIcon(QIcon("images/main.ico"), app)
         self.tray_icon_menu = QMenu()        
         # Create actions for the tray icon menu
