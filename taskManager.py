@@ -87,7 +87,7 @@ class TaskManager():
                 if not filename in self.paused_downloads:## filename in paused downloads has path with it but if it does not exist it creates name together with path selected
                     filename = self.file_manager.validate_filename(filename, path)
                     name_with_no_path = os.path.basename(filename)
-                    await self.append_file_details_to_storage(name_with_no_path, path, link, time.strftime(r'%Y-%m-%d')) 
+                    await self.append_file_details_to_storage(name_with_no_path, path, link, time.strftime('%Y-%m-%d %H:%M')) 
                 file = (link, filename, path)                
                 async with self.file_semaphore:  # Limit concurrent file downloads
                     asyncio.create_task(self.start_task(file))
@@ -290,7 +290,7 @@ class TaskManager():
         await self.progress_manager.update_file_details_on_storage_during_download(
             filename, info.get('link', ''), info.get('size', '---'), 
             info.get('downloaded', 0), status, speed, '---', 
-            time.strftime(r'%Y-%m-%d')
+            time.strftime('%Y-%m-%d %H:%M')
         )
 
                 

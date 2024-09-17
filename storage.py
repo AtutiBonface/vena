@@ -16,6 +16,8 @@ def initiate_database():
     conn.commit()
     conn.close()
 
+
+
 def add_data(filename, address,filesize, downloaded, status, modification_date, path):
     percentage = '---'
     conn2 = sqlite3.connect(location)
@@ -87,7 +89,7 @@ def delete_all_data():
 def clear_download_finished():
     conn = sqlite3.connect(location)
     cursor = conn.cursor()
-    cursor.execute('''DELETE FROM downloads WHERE  status = ?''', ('completed.',))
+    cursor.execute('''DELETE FROM downloads WHERE  status = ?''', ('Finished.',))
     conn.commit()
     conn.close()
 
@@ -113,3 +115,37 @@ def check_filename_existance(f_name):
     conn.close()
 
     return count > 0
+
+### settings
+def create_settings_database():
+    conn = sqlite3.connect(location)
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+    ''')
+    conn.commit()  # Save changes
+    conn.close()   # Close the connection
+
+def insert_setting(key, value):
+    conn = sqlite3.connect(location)
+    cursor = conn.cursor()
+    cursor.execute('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', (key, value))
+    conn.commit()
+    conn.close()
+
+def get_setting(key):
+    conn = sqlite3.connect(location)
+    cursor = conn.cursor()
+    cursor.execute('SELECT value FROM settings WHERE key = ?', (key,))
+    result = cursor.fetchone()
+    conn.close()
+    return result[0] if result else None
+def delete_setting(key):
+    conn = sqlite3.connect(location)
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM settings WHERE key = ?', (key,))
+    conn.commit()
+    conn.close()

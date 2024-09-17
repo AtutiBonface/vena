@@ -2,7 +2,16 @@ from PyQt6.QtWidgets import (QFrame, QWidget, QVBoxLayout,
                              QLabel, QPushButton, QScrollArea)
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QPixmap
+def switch_filelist_page(self, index):
+        for name , details in self.xengine_downloads.items():
+            if index == 0 and 'finished' not in details['status'].lower():
+                self.active_file_widgets[name].show()
 
+            else:
+               self.active_file_widgets[name].hide()
+               if index == 1 and  'finished' in details['status'].lower():
+                   self.active_file_widgets[name].show()
+        self.topbar.update_button_styles(index)
 class AboutWindow(QFrame):
     def __init__(self):
         super().__init__()

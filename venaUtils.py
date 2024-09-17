@@ -62,15 +62,25 @@ class ConfigFilesHandler:
             "\n",
             "*Note* Do not write or edit this file because your Vena Downloader will be faulty! Very faulty!\n",
             "\n",
-            f"default_download_path <x:e> {self.defaut_download_path} \n",
-            "max_concurrent_downloads <x:e> 5 \n",
-            "auto_resume_download <x:e> false \n",
-            "override_file <x:e> false\n",
-            "show_progress_window <x:e> true \n",
-            "show_download_complete_window <x:e> true \n",
+            f"DEFAULT_DOWNLOAD_PATH <x:e> {self.defaut_download_path} \n",
+            "MAX_CONCURRENT_DOWNLOADS <x:e> 5 \n",
+            "AUTO_RESUME_DOWNLOAD <x:e> False \n",
+            "SHOW_PROGRESS_WINDOW <x:e> True \n",
+            "SHOW_DOWNLOAD_COMPLETE_WINDOW <x:e> True \n",
             "\n",
-            "extensions_link <x:e> https://vena.imaginekenya.site/addons\n",
-            "VERSION <x:e> Vena 2.0 \n"
+            "EXTENSIONS_LINK <x:e> https://vena.imaginekenya.site/addons\n",
+            "VERSION <x:e> Vena 2.0 \n",
+            "AUTO_START_APP_WITH_SYSTEM <x:e> False \n",
+            "DEFAULT_BROWSER <x:e> system_default \n",
+            "BANDWIDTH_THROTTLING <x:e> unlimited \n",
+            "DOWNLOAD_PRIORITY <x:e> normal \n",
+            "AUTO_RESUME_OF_PAUSE_OR_INTERRUPTED <x:e> True \n",
+            "ENABLE_BROWSER_EXTENSION <x:e> True \n",
+            "FILE_TYPE_ASSOCIATION <x:e> .mp4, .mp3, .mkv, .avi, .flv, .mov, .wmv, .wav, .aac, .ogg  \n",
+            "ENABLE_DOWNLOAD_CONFIRMATION_POPUPS <x:e> True \n",
+            "ENABLE_CONTEXT_MENU_OPTIONS <x:e> True \n",
+            "LANGUAGE <x:e> english \n",
+            "THEME <x:e> light \n"
         ]
 
         try:

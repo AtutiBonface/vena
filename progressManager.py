@@ -34,7 +34,7 @@ class ProgressManager:
                         percentage = round((total_downloaded / total_size) * 100, 0)
 
                         await self.update_file_details_on_storage_during_download(
-                            filename, link, total_size, total_downloaded, f'Downloading..', speed_str,f'{percentage}%', time.strftime(r'%Y-%m-%d')
+                            filename, link, total_size, total_downloaded, f'Downloading..', speed_str,f'{percentage}%', time.strftime('%Y-%m-%d %H:%M')
                         )
 
                         # Update the last update time for this file
@@ -57,7 +57,7 @@ class ProgressManager:
             
                 
                 await self.update_file_details_on_storage_during_download(
-                    filename, link, size, downloaded_chunk, f'Downloading..', speed_str,f'{percentage}%', time.strftime(r'%Y-%m-%d')
+                    filename, link, size, downloaded_chunk, f'Downloading..', speed_str,f'{percentage}%', time.strftime('%Y-%m-%d %H:%M')
                 )
 
                 # Update the last update time for this file

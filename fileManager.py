@@ -65,12 +65,12 @@ class FileManager:
             shutil.rmtree(tem_folder)
             
             await self.task_manager.progress_manager.update_file_details_on_storage_during_download(
-                filename, link, size, size, 'Finished.', 0,'', time.strftime(r'%Y-%m-%d'))
+                filename, link, size, size, 'Finished.', 0,'', time.strftime('%Y-%m-%d %H:%M'))
         except Exception as e:
             
             downloaded = self.task_manager.size_downloaded_dict[filename][0]
             await self.task_manager.progress_manager.update_file_details_on_storage_during_download(
-                filename, link, size, downloaded, 'Failed!', 0,'', time.strftime(r'%Y-%m-%d'))
+                filename, link, size, downloaded, 'Failed!', 0,'', time.strftime('%Y-%m-%d %H:%M'))
 
 
 
@@ -93,7 +93,7 @@ class FileManager:
                         'link': link
                     }
                     await self.task_manager.progress_manager.progress_manager.update_file_details_on_storage_during_download(
-                        filename, link, size, downloaded_chunk, 'Paused.',speed,'', time.strftime(r'%Y-%m-%d')
+                        filename, link, size, downloaded_chunk, 'Paused.',speed,'', time.strftime('%Y-%m-%d %H:%M')
                     )
         
                     return
@@ -107,6 +107,8 @@ class FileManager:
                 del self.task_manager.paused_downloads[filename]
 
             await self.task_manager.progress_manager.update_file_details_on_storage_during_download(
-                filename, link, size, size, 'Finished.',speed,'', time.strftime(r'%Y-%m-%d')
+                filename, link, size, size, 'Finished.',speed,'', time.strftime('%Y-%m-%d %H:%M')
+
+                
             )
         

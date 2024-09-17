@@ -15,13 +15,16 @@ from taskManager import TaskManager
 from settingsPage  import SettingsWindow
 from aboutPage import AboutWindow
 from fileNotFound_plus import DeletionConfirmationWindow, FileNotFoundDialog
-
+from settings import AppSettings
 
 
 class MainApplication(QMainWindow):
     def __init__(self):
         super().__init__()
-        storage.initiate_database()        
+        storage.initiate_database()  
+        storage.create_settings_database() 
+        self.app_config =  AppSettings()
+        self.app_config.set_all_settings_to_database()     
         self.setup_data()
         self.setup_tray_icon()
         self.setup_window()
@@ -30,6 +33,9 @@ class MainApplication(QMainWindow):
         self.setup_layout()
         self.other_methods.set_rounded_corners(self)
         self.start_background_tasks()
+        self.switch_filelist_page(1)
+
+        
         
         
 
@@ -58,6 +64,8 @@ class MainApplication(QMainWindow):
         self.previously_clicked_btn = None
         self.details_of_file_clicked = None
         self.running_tasks = {}
+        self.active_file_widgets = {}
+        self.complete_file_widgets = {}
         self.file_widgets = {}
         self.files_to_be_downloaded = []   
         self.add_link_top_window = None
@@ -100,8 +108,8 @@ class MainApplication(QMainWindow):
 
     def setup_layout(self):
         self.file_list_stacked_widget = QStackedWidget()
-        self.file_list_stacked_widget.addWidget(self.complete_file_list)
         self.file_list_stacked_widget.addWidget(self.file_list)
+        self.file_list_stacked_widget.addWidget(self.complete_file_list)
 
         self.content_area.content_area.addWidget(self.topbar)
         self.content_area.content_area.addWidget(self.file_list_stacked_widget)
@@ -290,21 +298,43 @@ class MainApplication(QMainWindow):
 
             self.update_queue.put((name, updateDict['status'], size, downloaded,speed,percentage,date))
 
-    def update_file_widget(self, filename, status, size, downloaded,speed, percentage ,date):        
-        if filename in self.file_widgets:
-            self.file_widgets[filename].update_widget(filename, status,size, downloaded, date, speed, percentage)
-            if 'Finished' in status :
-                self.show_less_popup.download_completed()
-            elif "failed" in status.lower():
-                self.show_less_popup.download_failed()
+    def update_file_widget(self, filename, status, size, downloaded,speed, percentage ,date):                  
+        if 'finished' in status.lower():
+            self.show_less_popup.download_completed()
+            if filename in self.active_file_widgets:
+                widget = self.active_file_widgets.pop(filename)
+                self.file_list.file_layout.removeWidget(widget)
+                widget.setParent(None)
+            
+            if filename not in self.complete_file_widgets:
+                new_widget = FileItemWidget(
+                    app=self,
+                    filename=filename,
+                    path=self.xengine_downloads[filename]['path'],
+                    file_size=size,
+                    downloaded=downloaded,
+                    modified_date=date,
+                    status=status,
+                    percentage=percentage,
+                    speed=speed
+                )
+                self.complete_file_widgets[filename] = new_widget
+                self.complete_file_list.file_layout.addWidget(new_widget)
         else:
-            self.add_new_file_widget(filename, status, size, date)
+            if filename in self.active_file_widgets:
+                if "failed" in status.lower():
+                    self.show_less_popup.download_failed()
+                self.active_file_widgets[filename].update_widget(filename, status, size, downloaded, date, speed, percentage)
+            else:
+                self.add_new_file_widget(filename, status, size, date)
 
         
 
     def add_new_file_widget(self, filename, status, size, date): 
+        if self.file_list_stacked_widget.currentIndex() == 1:
+            self.switch_filelist_page(0)
         path = self.xengine_downloads[filename]['path']     
-        file_item = FileItemWidget(
+        new_widget = FileItemWidget(
                 app = self,
                 filename=f"{filename}",
                 path = path,
@@ -315,41 +345,10 @@ class MainApplication(QMainWindow):
                 percentage= f"---",
                 speed="---"
             )
-        self.file_widgets[filename] = file_item 
-        self.file_list.file_layout.insertWidget(0, file_item)
+        self.active_file_widgets[filename] = new_widget       
+        self.file_list.file_layout.insertWidget(0, new_widget)
        
     
-    def display_all_downloads_on_page(self):
-        for filename, detail in self.return_all_downloads().items():
-           
-            file_item = FileItemWidget(
-                app = self,
-                filename=f"{filename}",
-                path = detail['path'],
-                file_size=f"{detail['filesize']}",
-                downloaded=f"{detail['downloaded']}",
-                modified_date=f"{detail['modification_date']}",
-                status=detail['status'],
-                percentage= detail['percentage'],
-                speed=" "
-            ) 
-            self.file_widgets[filename] =file_item          
-            self.file_list.file_layout.addWidget(file_item)
-           
-
-
-    def display_complete_downloads_on_page(self):
-       
-        for filename, detail in self.return_all_downloads().items():
-            if filename  in self.file_widgets  and  detail['status'] == 'completed.':
-                pass
-            elif filename in self.file_widgets and  self.file_widgets[filename].winfo_exists():
-                pass
-            else:
-                if detail['status'] == 'completed.':
-                    self.add_new_file_widget(filename, detail['status'], detail['filesize'], detail['modification_date'])
-
-
     # File operations
     def pause_downloading_file(self, filename_with_path):
         f_name = os.path.basename(filename_with_path)
@@ -387,12 +386,12 @@ class MainApplication(QMainWindow):
 
             self.xengine_downloads[pathless_new_name] = value
                       
-        if pathless_old_name in self.file_widgets:
-            value = self.file_widgets.pop(pathless_old_name) 
+        if pathless_old_name in self.active_file_widgets:
+            value = self.active_file_widgets.pop(pathless_old_name) 
 
-            self.file_widgets[pathless_new_name] = value
+            self.active_file_widgets[pathless_new_name] = value
 
-            file_widget = self.file_widgets[pathless_new_name]
+            file_widget = self.active_file_widgets[pathless_new_name]
 
             if file_widget.isVisible():
                 file_widget.update_filename(new_name)
@@ -411,19 +410,33 @@ class MainApplication(QMainWindow):
         self.remove_individual_file_widget(filename) ## destroy widget
 
     def remove_individual_file_widget(self, filename):  
-        widget = self.file_widgets[filename]         
-        self.file_list.file_layout.removeWidget(widget)
-        widget.hide()
+        if filename in  self.active_file_widgets:
+            widget = self.active_file_widgets[filename]
+            self.file_list.file_layout.removeWidget(widget) 
+            widget.setParent(None)
+        elif filename in  self.complete_file_widgets: 
+             widget = self.complete_file_widgets[filename] 
+             self.complete_file_list.file_layout.removeWidget(widget)
+             widget.setParent(None)
+        
+        
         self.previously_clicked_btn = None
         self.details_of_file_clicked = None
        
        
 
     def clear_displayed_files_widgets(self):
-        for widget in self.file_widgets.items():
-            pass
-           
-        self.file_widgets = {}
+        if self.file_list_stacked_widget.currentIndex() == 0:
+            self.switch_filelist_page(1)
+        for filename,widget in self.complete_file_widgets.items():
+            self.complete_file_list.file_layout.removeWidget(widget)
+            widget.setParent(None)
+
+
+        self.previously_clicked_btn = None
+        self.previously_clicked_file = None             
+        storage.clear_download_finished()        
+        self.complete_file_widgets = {}
         
           
 
@@ -469,8 +482,7 @@ class TopBar(QFrame):
         navigation_layout.setContentsMargins(0, 0, 0, 0)
         navigation_layout.setAlignment(Qt.AlignmentFlag.AlignRight)
         main_layout.addWidget(separator)  
-        self.update_button_styles(1)
-    
+        self.update_button_styles(0)
 
     def open_link_box(self):       
         self.app.add_link_top_window = AddLink(app=self.app, task_manager=self.task_manager)
@@ -658,30 +670,41 @@ class ActiveFileList(QScrollArea):
         # Create a widget to contain the layout
         self.scroll_widget = QFrame()
         self.scroll_widget.setStyleSheet('background-color: transparent;')
-        self.file_lay = QVBoxLayout(self.scroll_widget)
-        self.file_lay.setAlignment(Qt.AlignmentFlag.AlignTop)     
-        self.display_incomplete_downloads_on_page()
+        self.file_layout = QVBoxLayout(self.scroll_widget)
+        self.file_layout.setAlignment(Qt.AlignmentFlag.AlignTop)     
+        self.display_incomplete_downloads()
 
         self.setWidget(self.scroll_widget)
         self.setWidgetResizable(True)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded) 
 
-    def display_incomplete_downloads_on_page(self):
-        for filename, detail in self.app.return_all_downloads().items():
+        
+
+    def display_incomplete_downloads(self):
+        self.sorted_downloads = sorted(
+            self.app.return_all_downloads().items(),
+            key=lambda x: x[1]['modification_date'],
+            reverse=True
+        )
+        for filename, detail in self.sorted_downloads:
             if 'finished' not in detail['status'].lower():
-                file_item = FileItemWidget(
-                    app = self.app,
-                    filename=f"{filename}",
-                    path = detail['path'],
-                    file_size=f"{detail['filesize']}",
-                    downloaded=f"{detail['downloaded']}",
-                    modified_date=f"{detail['modification_date']}",
-                    status=detail['status'],
-                    percentage= detail['percentage'],
-                    speed=" "
-                ) 
-                self.app.file_widgets[filename] = file_item          
-                self.file_lay.addWidget(file_item)
+                self.add_file_widget(filename, detail)
+
+    def add_file_widget(self, filename, detail):
+        if filename not in self.app.active_file_widgets:
+            file_item = FileItemWidget(
+                app=self.app,
+                filename=filename,
+                path=detail['path'],
+                file_size=detail['filesize'],
+                downloaded=detail['downloaded'],
+                modified_date=detail['modification_date'],
+                status=detail['status'],
+                percentage=detail['percentage'],
+                speed=" "
+            )
+            self.app.active_file_widgets[filename] = file_item          
+            self.file_layout.insertWidget(0, file_item)
 
 class CompleteFileList(QScrollArea):
     def __init__(self, app):
@@ -697,17 +720,23 @@ class CompleteFileList(QScrollArea):
         self.setWidget(self.scroll_widget)
         self.setWidgetResizable(True)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded) 
-      
+       
+
 
 
         # Set the scrollable widget
     def display_complete_downloads(self):
-        for filename, detail in self.app.return_all_downloads().items():
+        self.sorted_downloads = sorted(
+            self.app.return_all_downloads().items(),
+            key=lambda x: x[1]['modification_date'],
+            reverse=True
+        )
+        for filename, detail in self.sorted_downloads:
             if 'finished' in detail['status'].lower():
                 self.add_file_widget(filename, detail)
 
     def add_file_widget(self, filename, detail):
-        if filename not in self.app.file_widgets:
+        if filename not in self.app.complete_file_widgets:
             file_item = FileItemWidget(
                 app=self.app,
                 filename=filename,
@@ -719,9 +748,8 @@ class CompleteFileList(QScrollArea):
                 percentage=detail['percentage'],
                 speed=" "
             )
-            self.app.file_widgets[filename] = file_item
-            self.file_layout.addWidget(file_item)
-           
+            self.app.complete_file_widgets[filename] = file_item
+            self.file_layout.insertWidget(0, file_item)
 
 
 class FileItemWidget(QFrame):
@@ -1215,9 +1243,14 @@ class CustomTitleBar(QFrame):
         print("Add Links selected")
 
     def clear_finished(self):
-        print("Clear Finished selected")
+        self.parent.clear_displayed_files_widgets()
 
     def delete_selected(self):
-        print("Delete Selected selected")
+       if self.parent.details_of_file_clicked:
+            f_name , path = self.parent.details_of_file_clicked 
+
+            file_to_delete = os.path.join(path, f_name)
+            self.confirm = DeletionConfirmationWindow(self.parent, f_name, file_to_delete)
+            self.confirm.show()
 
 
