@@ -44,7 +44,6 @@ class ProgressManager:
 
         current_time = time.time()
 
-
         if filename not in self.last_update_time or current_time - self.last_update_time.get(filename, 0) >= self.update_interval:
             unit_time = time.time() - start_time
 
@@ -53,13 +52,11 @@ class ProgressManager:
                 speed = down_in_mbs / unit_time
                 new_speed = round(speed, 3)
                 speed_str = self.other_methods.returnSpeed(new_speed)
-                percentage = round((downloaded_chunk / size) * 100, 0)
-            
+                percentage = round((downloaded_chunk / size) * 100, 0)            
                 
                 await self.update_file_details_on_storage_during_download(
                     filename, link, size, downloaded_chunk, f'Downloading..', speed_str,f'{percentage}%', time.strftime('%Y-%m-%d %H:%M')
                 )
-
                 # Update the last update time for this file
                 self.last_update_time[filename] = current_time 
             else:           

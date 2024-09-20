@@ -71,6 +71,7 @@ class DownloadIndicator(QWidget):
         close_button.setIconSize(QSize(10, 10))
         expand_app_button.setIconSize(QSize(15, 15))
         expand_app_button.clicked.connect(self.open_app)
+        self.setWindowIcon(QIcon('images/main.ico'))
         title_bar.setObjectName("title-bar")
         expand_app_button.setObjectName("expand-btn")
         close_button.setObjectName("close-btn")
