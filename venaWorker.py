@@ -4,7 +4,8 @@ import json, aiofiles,os
 from pathlib import Path
 from PyQt6.QtWidgets import QMenu, QSystemTrayIcon
 from PyQt6.QtGui import QIcon,QAction
-
+from collections import defaultdict
+import asyncio
 class Worker(QObject):
     update_signal = pyqtSignal(str, str, str, str,str, str, str)
 
@@ -25,31 +26,40 @@ class Worker(QObject):
 class SegmentTracker:
     def __init__(self, filename):
         self.filename = filename
+        self.segment_lock = defaultdict(asyncio.Lock)
         self.segments = {}
         self.progress_file = Path(f"{Path.home()}/.venaApp/temp/.{os.path.basename(filename)}/progress.json")
 
     async def load_progress(self):
-        if self.progress_file.exists():
-            async with aiofiles.open(self.progress_file, 'r') as f:
-                self.segments = json.loads(await f.read())
-
-            print("saved ", self.segments)
-                
-        else:
-          
-            # Initialize the file with an empty JSON object if it does not exist
-            self.segments = {}
-            await self.save_progress()
+        async with self.segment_lock[self.progress_file]:  # Lock while loading
+            if self.progress_file.exists():
+                async with aiofiles.open(self.progress_file, 'r') as f:
+                    try:
+                        self.segments = json.loads(await f.read())
+                        self.segments = {str(k): v for k, v in self.segments.items()}
+                    except json.JSONDecodeError:
+                        print('There is an error with json in segment worker')
+                        self.segments = {}  # Reset if there's a loading error
+            else:
+                self.segments = {}
+                await self.save_progress()
 
     async def save_progress(self):
-        async with aiofiles.open(self.progress_file, 'w') as f:
-            await f.write(json.dumps(self.segments))
+        async with self.segment_lock[self.progress_file]:
+            segments_with_str_keys = {str(k): v for k, v in self.segments.items()}
+            async with aiofiles.open(self.progress_file, 'w') as f:
+                await f.write(json.dumps(segments_with_str_keys))
 
-    def update_segment(self, segment_id, downloaded, total):        
+
+    def update_segment(self, segment_id, downloaded, total):  
+        segment_id = str(segment_id)
+        
         self.segments[segment_id] = {'downloaded': downloaded, 'total': total}
+          
         
 
     def get_segment_progress(self, segment_id):
+        segment_id = str(segment_id)
         return self.segments.get(segment_id, {'downloaded': 0, 'total': 0})
 
 

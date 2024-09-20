@@ -75,20 +75,23 @@ class NetworkManager:
 
         if filename not in self.segment_trackers:
             self.segment_trackers[filename] = SegmentTracker(filename)
-        await self.segment_trackers[filename].load_progress()
-            
-            
+        
         segment_tracker = self.segment_trackers[filename]
-        segment_progress = segment_tracker.get_segment_progress(segment_id)       
-       
-        print("segment progress",segment_progress)
+        async with segment_tracker.segment_lock[segment_filename]:
+            await segment_tracker.load_progress()
+
+      
+        async with segment_tracker.segment_lock[segment_filename]:
+            segment_progress = segment_tracker.get_segment_progress(segment_id)    
+
+      
+        
         segment_total = segment_size
 
         # Check if the segment is partially or fully downloaded
         if segment_filename.exists():
             segment_downloaded = segment_progress['downloaded']
             
-
         while retry_attempts < max_retries and not success:
            
             try:
@@ -118,25 +121,27 @@ class NetworkManager:
                             async for chunk in response.content.iter_chunked(self.config.CHUNK_SIZE):
                                 # Check if download is paused
                                 pause_event = self.task_manager._get_or_create_pause_event(filename)
-                                if not pause_event.is_set():                                    
-                                    await segment_tracker.save_progress()
+                                if not pause_event.is_set():
+                                    async with segment_tracker.segment_lock[segment_filename]:                                    
+                                        await segment_tracker.save_progress()
                                     self.paused = True
                                     raise DownloadPausedError('segment-paused')
 
                                 await file.write(chunk)
-                                chunk_size = len(chunk)
-                                segment_downloaded += chunk_size
-                                segment_tracker.update_segment(segment_id, segment_downloaded, segment_total)
+                                segment_downloaded += len(chunk)
+                                async with segment_tracker.segment_lock[segment_filename]:
+                                    segment_tracker.update_segment(segment_id, segment_downloaded, segment_total)
                                 # Lock and update UI for download progress
                                 
                                 async with self.task_manager.file_locks[segment_filename]:
                                     if filename in self.task_manager.size_downloaded_dict:
                                         self.task_manager.size_downloaded_dict[filename][0] += len(chunk)
                                     else:
-                                        self.task_manager.size_downloaded_dict[filename] = [len(chunk), time.time()]
+                                        self.task_manager.size_downloaded_dict[filename] = [segment_downloaded, time.time()]
                                 await self.task_manager.progress_manager._handle_segments_downloads_ui(filename, address, total_filesize)
-                                
-                        await segment_tracker.save_progress()
+
+                        async with segment_tracker.segment_lock[segment_filename]:
+                            await segment_tracker.save_progress()
                         success = True
                         return True  # inaonyesha downloading was successful
                     else:
