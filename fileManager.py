@@ -92,15 +92,13 @@ class FileManager:
                         'size': size,
                         'link': link
                     }
-                    await self.task_manager.progress_manager.progress_manager.update_file_details_on_storage_during_download(
+                    await self.task_manager.progress_manager.update_file_details_on_storage_during_download(
                         filename, link, size, downloaded_chunk, 'Paused.',speed,'', time.strftime('%Y-%m-%d %H:%M')
                     )
         
                     return
                 await f.write(chunk)
-
                 downloaded_chunk += len(chunk)
-
                 await self.task_manager.progress_manager._update_progress(filename, link, size, downloaded_chunk, start_time)
 
             if filename in self.task_manager.paused_downloads:

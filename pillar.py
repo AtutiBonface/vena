@@ -19,12 +19,11 @@ from settings import AppSettings
 
 
 class MainApplication(QMainWindow):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, loop, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         storage.initiate_database()  
-        storage.create_settings_database() 
-        self.app_config =  AppSettings()
-        self.app_config.set_all_settings_to_database()     
+        storage.create_settings_database()   
+        self.loop = loop
         self.setup_data()
         self.setup_tray_icon()
         self.setup_window()
@@ -60,6 +59,8 @@ class MainApplication(QMainWindow):
         self.other_methods = OtherMethods()
         self.update_queue = queue.Queue()
         self.show_less_popup = DownloadIndicator(self)
+        self.app_config =  AppSettings()
+        self.app_config.set_all_settings_to_database()   
         self.other_methods.set_rounded_corners(self.show_less_popup)
         self.previously_clicked_btn = None
         self.details_of_file_clicked = None
@@ -100,7 +101,7 @@ class MainApplication(QMainWindow):
         self.stacked_widget = QStackedWidget()
         self.home_page = self.content_area
         self.about_page = AboutWindow()
-        self.settings_page = SettingsWindow()
+        self.settings_page = SettingsWindow(self)
         
         self.stacked_widget.addWidget(self.home_page)
         self.stacked_widget.addWidget(self.about_page)
@@ -354,11 +355,11 @@ class MainApplication(QMainWindow):
         f_name = os.path.basename(filename_with_path)
         self.load_downloads_from_db()## reasign values to xengine_downloads to get updated values for downloaded chuck
         for name , details in self.xengine_downloads.items():
-            if name == f_name and not  ( 'Finished' in details['status']or details['status'] == '100.0%'):
+            if name == f_name and not  ( 'finished' in details['status'].lower() or details['status'] == '100.0%'):
                 size = details['filesize']
                 link = details['url']
                 downloaded = details['downloaded']           
-                #asyncio.run_coroutine_threadsafe(self.task_manager.pause_downloads_fn(filename_with_path, size, link ,downloaded), self.task_manager.loop)
+                asyncio.run_coroutine_threadsafe(self.task_manager.pause_downloads_fn(filename_with_path, size, link ,downloaded), self.loop)
                 
     def resume_paused_file(self, filename_with_path):
         def safe_int(value):
@@ -371,11 +372,11 @@ class MainApplication(QMainWindow):
         self.downloaded_chuck = 0
         self.file_size = 0
         for name , details in self.xengine_downloads.items():
-            if name == f_name and not ('Finished' in details['status'] or details['percentage'] == '100.0%'):
+            if name == f_name and not ('finished' in details['status'].lower() or details['percentage'] == '100.0%'):
                 self.downloaded_chuck = safe_int(details.get('downloaded', 0))
-                self.file_size = safe_int(details.get('filesize', 0))               
+                self.file_size = safe_int(details.get('filesize', 0))              
     
-                asyncio.create_task(self.task_manager.resume_downloads_fn(filename_with_path,  details['url'], self.downloaded_chuck))
+                asyncio.run_coroutine_threadsafe(self.task_manager.resume_downloads_fn(filename_with_path,  details['url'], self.downloaded_chuck)  ,self.loop)
         
     def update_filename(self, old_name, new_name):     
         pathless_old_name = os.path.basename(old_name)
@@ -573,9 +574,10 @@ class BottomBar(QFrame):
                 self.confirm.show()
                     
             elif text.strip() == 'Pause':
+                self.app.pause_downloading_file(path_and_file)
                 pass ## pause downloading
             elif text.strip() == 'Resume':
-                pass ## resume downloading
+                self.app.resume_paused_file(path_and_file)
             elif text.strip() == 'Restart':
                 pass ### restart donwload
             

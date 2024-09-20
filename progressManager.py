@@ -22,7 +22,7 @@ class ProgressManager:
         
         # Check if enough time has passed since the last update
         if filename not in self.last_update_time or current_time - self.last_update_time.get(filename, 0) >= self.update_interval:
-            async with self.task_manager.lock:
+            async with self.task_manager.file_locks[filename]:
                 if filename in self.task_manager.size_downloaded_dict:
                     total_downloaded, start_time = self.task_manager.size_downloaded_dict[filename]
                     unit_time = time.time() - start_time

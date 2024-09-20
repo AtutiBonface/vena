@@ -28,7 +28,7 @@ class NetworkManager:
         self.ssl_context = ssl.create_default_context(cafile=certifi.where())  # SSL context to use certifi's certificates
 
     async def create_session(self, connector):       
-        return aiohttp.ClientSession(connector=connector, headers=self.headers, timeout=aiohttp.ClientTimeout(total=None))  # Create an aiohttp session with a custom connector and headers
+        return aiohttp.ClientSession(connector=connector, headers=self.headers, timeout=aiohttp.ClientTimeout(total=10))  # Create an aiohttp session with a custom connector and headers
     
     async def fetch_m3u8_segment_size(self, session, url): # Fetch the size of a single m3u8 segment by checking the Content-Length header
         async with session.get(url) as response:
@@ -63,6 +63,7 @@ class NetworkManager:
         max_retries = 5
         success = False
         segment_downloaded = 0
+        self.paused = False
         user_agents = [
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36',
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:90.0) Gecko/20100101 Firefox/90.0',
@@ -74,15 +75,19 @@ class NetworkManager:
 
         if filename not in self.segment_trackers:
             self.segment_trackers[filename] = SegmentTracker(filename)
-            await self.segment_trackers[filename].load_progress()
+        await self.segment_trackers[filename].load_progress()
+            
             
         segment_tracker = self.segment_trackers[filename]
-        segment_progress = segment_tracker.get_segment_progress(segment_id)        
+        segment_progress = segment_tracker.get_segment_progress(segment_id)       
+       
+        print("segment progress",segment_progress)
         segment_total = segment_size
 
         # Check if the segment is partially or fully downloaded
         if segment_filename.exists():
             segment_downloaded = segment_progress['downloaded']
+            
 
         while retry_attempts < max_retries and not success:
            
@@ -113,10 +118,10 @@ class NetworkManager:
                             async for chunk in response.content.iter_chunked(self.config.CHUNK_SIZE):
                                 # Check if download is paused
                                 pause_event = self.task_manager._get_or_create_pause_event(filename)
-                                if not pause_event.is_set():
-                                    
-                                    await self.task_manager.save_progress()
-                                    return False  # Indicate that the download was paused'''
+                                if not pause_event.is_set():                                    
+                                    await segment_tracker.save_progress()
+                                    self.paused = True
+                                    raise DownloadPausedError('segment-paused')
 
                                 await file.write(chunk)
                                 chunk_size = len(chunk)
@@ -135,17 +140,39 @@ class NetworkManager:
                         success = True
                         return True  # inaonyesha downloading was successful
                     else:
-                        self.logger.warning(f"Segment {segment_id} returned status {response.status}. Retry attempt {retry_attempts}.")
                         retry_attempts += 1
                         await asyncio.sleep(retry_attempts * 2 + random.uniform(0.5, 1.5))
             except asyncio.CancelledError:
                 # Handle cancellation (e.g., due to pausing)
                 await segment_tracker.save_progress()
                 return False  
+            
+            
             except Exception as e:
-                self.logger.error(f"Exception during download of segment {segment_id}: {e}")
-                retry_attempts += 1
-                await asyncio.sleep(retry_attempts * 2 + random.uniform(0.5, 1.5))
+                if not  str(e).startswith('segment-paused'):            
+                   
+                    retry_attempts += 1
+                    await asyncio.sleep(retry_attempts * 2 + random.uniform(0.5, 1.5))
+                    self.paused = False
+                    if retry_attempts == 4:
+                        raise SegmentDownloadError('Failed')
+                else:
+                    raise DownloadPausedError('Paused')
 
-        print(f"Failed to download segment {segment_id} of {filename} after {max_retries} attempts.")
-        return False
+        if not self.paused:
+            raise SegmentDownloadError('Failed')
+        else:
+            raise DownloadPausedError('Paused')
+
+
+class SegmentDownloadError(Exception):
+    """Custom exception raised when a segment fails to download after retries."""
+    def __init__(self, message):
+        self.message = message
+        super().__init__(self.message)
+
+class DownloadPausedError(Exception):
+    
+    def __init__(self, message="Download paused."):
+        self.message = message
+        super().__init__(self.message)

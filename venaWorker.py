@@ -33,7 +33,10 @@ class SegmentTracker:
             async with aiofiles.open(self.progress_file, 'r') as f:
                 self.segments = json.loads(await f.read())
 
+            print("saved ", self.segments)
+                
         else:
+          
             # Initialize the file with an empty JSON object if it does not exist
             self.segments = {}
             await self.save_progress()
@@ -42,8 +45,9 @@ class SegmentTracker:
         async with aiofiles.open(self.progress_file, 'w') as f:
             await f.write(json.dumps(self.segments))
 
-    def update_segment(self, segment_id, downloaded, total):
+    def update_segment(self, segment_id, downloaded, total):        
         self.segments[segment_id] = {'downloaded': downloaded, 'total': total}
+        
 
     def get_segment_progress(self, segment_id):
         return self.segments.get(segment_id, {'downloaded': 0, 'total': 0})

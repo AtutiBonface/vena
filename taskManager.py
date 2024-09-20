@@ -6,7 +6,7 @@ import shutil, m3u8
 from venaUtils import OtherMethods
 from urllib.parse import urlparse, urlunparse, urljoin
 from fileManager import FileManager
-from networkManager import NetworkManager
+from networkManager import DownloadPausedError, NetworkManager, SegmentDownloadError
 from progressManager import ProgressManager
 from collections import defaultdict
 
@@ -102,6 +102,7 @@ class TaskManager():
         created_session = await self.network_manager.create_session(connector)
         async with created_session as session:        
             downloaded_chunk = self.paused_downloads.get(filename, {}).get('downloaded', 0)
+            
             size = 0
             speed =0            
             try:
@@ -134,20 +135,44 @@ class TaskManager():
                                        
                                 try:
                                     await asyncio.gather(*m3u8_tasks)
-                                    await asyncio.sleep(self.config.CONCURRENCY_DELAY)
-                                except asyncio.CancelledError:
+                                    await self.file_manager.combine_segments(filename, link, size, len(segments_urls))
+                                    async with self.file_locks[filename]:
+                                        if filename in self.size_downloaded_dict:
+                                            del self.size_downloaded_dict[filename]
+                                except SegmentDownloadError as e:
+                                    # Handle cancellation failed
+                                    for task in m3u8_tasks:
+                                        if not task.done():
+                                            task.cancel()
+                                    await asyncio.gather(*m3u8_tasks, return_exceptions=True)
+                                    filesize_downloaded, _ = self.size_downloaded_dict[filename]
+                                    if int(filesize_downloaded) > 0:
+                                        percentage = f'{filesize_downloaded/size * 100}' 
+                                    else:
+                                        percentage = f'---'
+                                        
+                                    await self.progress_manager.update_file_details_on_storage_during_download(
+                                        filename,link, size, filesize_downloaded, 'Failed', speed, percentage, time.strftime('%Y-%m-%d')
+                                    )
+                                    return
+                                except DownloadPausedError as e:
                                     # Handle cancellation (e.g., due to pausing)
                                     for task in m3u8_tasks:
                                         if not task.done():
                                             task.cancel()
                                     await asyncio.gather(*m3u8_tasks, return_exceptions=True)
-                                    return
-                                
-                            await self.file_manager.combine_segments(filename, link, size, len(segments_urls))
-                            async with self.file_locks[filename]:
-                                if filename in self.size_downloaded_dict:
-                                    del self.size_downloaded_dict[filename]
 
+                                    filesize_downloaded, _ = self.size_downloaded_dict[filename]
+                                    if filesize_downloaded > 0:
+                                        percentage =  f'{round(filesize_downloaded/size * 100, 0)}%'  
+                                    else:
+                                        percentage = f'---'
+
+                                    await self.progress_manager.update_file_details_on_storage_during_download(
+                                        filename,link, size, filesize_downloaded, 'Paused.', '---', percentage, time.strftime('%Y-%m-%d')
+                                    )
+                                    return 
+                            
                         else:## if it is not a .m3u8 file
                             size = int(resp.headers.get('Content-Length', 0))
                             content_type = resp.headers.get('Content-Type', '')                           
@@ -176,62 +201,90 @@ class TaskManager():
                                        
                                 try:
                                     await asyncio.gather(*other_file_type_tasks)
-                                    await asyncio.sleep(self.config.CONCURRENCY_DELAY)
-                                except asyncio.CancelledError:
+        
+                                    await self.file_manager.combine_segments(filename,link,size, num_segments)
+
+                                    async with self.file_locks[filename]:
+                                        if filename in self.size_downloaded_dict:
+                                            del self.size_downloaded_dict[filename] 
+                                except SegmentDownloadError as e:
+                                    # Handle cancellation failed
+                                    for task in other_file_type_tasks:
+                                        if not task.done():
+                                            task.cancel()
+                                    await asyncio.gather(*other_file_type_tasks, return_exceptions=True)
+
+                                    filesize_downloaded, _ = self.size_downloaded_dict[filename]
+                                    if filesize_downloaded > 0:
+                                        percentage =  f'{round(filesize_downloaded/size * 100, 0)}%'  
+                                    else:
+                                        percentage = f'---'
+
+                                    await self.progress_manager.update_file_details_on_storage_during_download(
+                                        filename,link, size, filesize_downloaded, 'Failed', speed, percentage, time.strftime('%Y-%m-%d')
+                                    )
+                                    return
+                                except DownloadPausedError as e:
                                     # Handle cancellation (e.g., due to pausing)
                                     for task in other_file_type_tasks:
                                         if not task.done():
                                             task.cancel()
                                     await asyncio.gather(*other_file_type_tasks, return_exceptions=True)
+                                    filesize_downloaded, _ = self.size_downloaded_dict[filename]
+                                    if filesize_downloaded > 0:
+                                        percentage = f'{round(filesize_downloaded/size * 100, 0)}%' 
+                                    else:
+                                        percentage = f'---'
+
+                                    await self.progress_manager.update_file_details_on_storage_during_download(
+                                        filename,link, size, filesize_downloaded, 'Paused.', '---', percentage, time.strftime('%Y-%m-%d')
+                                    )
                                     return
-
-                                await self.file_manager.combine_segments(filename,link,size, num_segments)
-
-                                async with self.file_locks[filename]:
-                                    if filename in self.size_downloaded_dict:
-                                        del self.size_downloaded_dict[filename]  
+                                
                             else:                               
                                 await self.file_manager._handle_download(resp, filename, link, downloaded_chunk)
                                
                     else:
                         error_message = f"failed! : Unexpected status {resp.status}"
+
+                        print(error_message)
                         await self.progress_manager.update_file_details_on_storage_during_download(
                 filename,link, size, downloaded_chunk, error_message, speed, '---', time.strftime('%Y-%m-%d'))
                         
             
             except aiohttp.ClientError as e: 
                 error_message = f"failed! : ClientError - {str(e)}"
-                print(e)
+                print(error_message)
                 await self.progress_manager.update_file_details_on_storage_during_download(
                     filename,link, size, downloaded_chunk, error_message, speed, '---', time.strftime('%Y-%m-%d')
                 )
             except asyncio.TimeoutError as e:
                 error_message = f"failed! : TimeoutError - {str(e)}"
-                print(e)
+                print(error_message)
                 await self.progress_manager.update_file_details_on_storage_during_download(
                     filename,link, size, downloaded_chunk, error_message, speed, '---', time.strftime('%Y-%m-%d')
                 )
             except ssl.SSLError as e:
                 error_message = f"failed! : SSLError - {str(e)}"
-                print(e)
+                print(error_message)
                 await self.progress_manager.update_file_details_on_storage_during_download(
                     filename,link, size, downloaded_chunk, error_message, speed, '---', time.strftime('%Y-%m-%d')
                 )
             except OSError as e:
                 error_message = f"failed! : OSError - {str(e)}"
-                print(e)
+                print(error_message)
                 await self.progress_manager.update_file_details_on_storage_during_download(
                     filename,link, size, downloaded_chunk, error_message, speed, '---', time.strftime('%Y-%m-%d')
                 )
             except ValueError as e:
                 error_message = f"failed! : ValueError - {str(e)}"
-                print(e)
+                print(error_message)
                 await self.progress_manager.update_file_details_on_storage_during_download(
                     filename,link, size, downloaded_chunk, error_message, speed, '---', time.strftime('%Y-%m-%d')
                 )
             except RuntimeError as e:
                 error_message = f"failed! : RuntimeError - {str(e)}"
-                print(e)
+                print(error_message)
                 await self.progress_manager.update_file_details_on_storage_during_download(
                     filename,link, size, downloaded_chunk, error_message, speed, '---', time.strftime('%Y-%m-%d')
                 )
@@ -259,9 +312,8 @@ class TaskManager():
                         'size': size,
                         'link': link,
                         'resume': False
-                    }
-       
-        await self.update_all_active_downloads('Paused', filename)
+                    }       
+        await self.update_all_active_downloads('Paused.', filename)
 
     async def resume_downloads_fn(self, name, address, downloaded):
         pause_event = self._get_or_create_pause_event(name)
@@ -271,8 +323,7 @@ class TaskManager():
             'size': '---',
             'link': address,
             'resume': True
-        }
-        
+        }        
         for filename, info in self.paused_downloads.items():
             if name == filename:                          
                 await self.addQueue((info['link'], filename, None))

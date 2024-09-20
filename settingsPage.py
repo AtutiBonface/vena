@@ -7,9 +7,9 @@ from PyQt6.QtGui import QIcon
 import storage
 from settings import AppSettings
 class SettingsWindow(QFrame):
-    def __init__(self , app):
+    def __init__(self, app):
         super().__init__() 
-        self.app_config = AppSettings()
+        self.app_config = app.app_config
        
         self.default_download_path = storage.get_setting('DEFAULT_DOWNLOAD_PATH')
         self.max_concurrent_downloads = storage.get_setting('MAX_CONCURRENT_DOWNLOADS')
