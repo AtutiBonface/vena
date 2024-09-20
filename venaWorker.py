@@ -26,37 +26,35 @@ class Worker(QObject):
 class SegmentTracker:
     def __init__(self, filename):
         self.filename = filename
-        self.segment_lock = defaultdict(asyncio.Lock)
+        self.segment_lock = asyncio.Lock()
         self.segments = {}
         self.progress_file = Path(f"{Path.home()}/.venaApp/temp/.{os.path.basename(filename)}/progress.json")
 
     async def load_progress(self):
-        async with self.segment_lock[self.progress_file]:  # Lock while loading
+        async with self.segment_lock:
             if self.progress_file.exists():
-                async with aiofiles.open(self.progress_file, 'r') as f:
-                    try:
-                        self.segments = json.loads(await f.read())
-                        self.segments = {str(k): v for k, v in self.segments.items()}
-                    except json.JSONDecodeError:
-                        print('There is an error with json in segment worker')
-                        self.segments = {}  # Reset if there's a loading error
+                try:
+                    async with aiofiles.open(self.progress_file, 'r') as f:
+                        content = await f.read()
+                        self.segments = json.loads(content)
+                except (json.JSONDecodeError, IOError) as e:
+                    print(f"Error loading progress file: {e}")
+                    self.segments = {}
             else:
                 self.segments = {}
                 await self.save_progress()
 
     async def save_progress(self):
-        async with self.segment_lock[self.progress_file]:
-            segments_with_str_keys = {str(k): v for k, v in self.segments.items()}
-            async with aiofiles.open(self.progress_file, 'w') as f:
-                await f.write(json.dumps(segments_with_str_keys))
+            try:
+                self.progress_file.parent.mkdir(parents=True, exist_ok=True)
+                async with aiofiles.open(self.progress_file, 'w') as f:
+                    await f.write(json.dumps(self.segments, indent=2))
+            except IOError as e:
+                print(f"Error saving progress file: {e}")
 
-
-    def update_segment(self, segment_id, downloaded, total):  
+    def update_segment(self, segment_id, downloaded, total):
         segment_id = str(segment_id)
-        
         self.segments[segment_id] = {'downloaded': downloaded, 'total': total}
-          
-        
 
     def get_segment_progress(self, segment_id):
         segment_id = str(segment_id)

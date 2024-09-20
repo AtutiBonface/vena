@@ -175,6 +175,8 @@ class TaskManager():
                             
                         else:## if it is not a .m3u8 file
                             size = int(resp.headers.get('Content-Length', 0))
+
+                            
                             content_type = resp.headers.get('Content-Type', '')                           
                             
                             f_n, ex = os.path.splitext(os.path.basename(filename))
@@ -195,13 +197,17 @@ class TaskManager():
 
                                     segment_size = end - start + 1
 
-                                    async with self.segment_semaphore:                                        
+                                  
+
+                                    async with self.segment_semaphore:     
+                                    
                                         task = asyncio.create_task(self.download_segment(session, filename, link, self.headers, start, end, seg_no, segment_size, size))
                                         other_file_type_tasks.append(task)
                                        
                                 try:
                                     await asyncio.gather(*other_file_type_tasks)
-        
+
+                                       
                                     await self.file_manager.combine_segments(filename,link,size, num_segments)
 
                                     async with self.file_locks[filename]:
@@ -240,7 +246,7 @@ class TaskManager():
                                         filename,link, size, filesize_downloaded, 'Paused.', '---', percentage, time.strftime('%Y-%m-%d')
                                     )
                                     return
-                                
+                               
                             else:                               
                                 await self.file_manager._handle_download(resp, filename, link, downloaded_chunk)
                                
@@ -327,8 +333,17 @@ class TaskManager():
         for filename, info in self.paused_downloads.items():
             if name == filename:                          
                 await self.addQueue((info['link'], filename, None))
+
+        async with self.file_locks[filename]:
+            if name in self.size_downloaded_dict:
+                print('----name--exists---------')
+            else:
+                print(f'-----name-doesnt exists--------{name}-')
+                self.size_downloaded_dict[name] = [downloaded, time.time()]
+
+                
             
-        await self.update_all_active_downloads('Resuming..', filename)
+        await self.update_all_active_downloads('Resuming..', name)
         async with self.condition:
             self.condition.notify_all()
 
