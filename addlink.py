@@ -77,6 +77,7 @@ class AddLink(QWidget):
         savein_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         savein_label.setObjectName("label")
         self.savein_entry = QLineEdit()
+        self.savein_entry.setDisabled(True)
         self.savein_entry.setText(self.download_path)
         self.savein_entry.setObjectName("entry")
         savein_more_btn = QPushButton(QIcon('images/change.png'), "")
@@ -102,7 +103,6 @@ class AddLink(QWidget):
         main_layout.addWidget(address_frame)
         main_layout.addWidget(filename_frame)
         main_layout.addWidget(savein_frame)
-        ##main_layout.addSpacerItem(QSpacerItem(20, 20, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
         main_layout.addWidget(download_button_frame)
 
         

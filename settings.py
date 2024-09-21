@@ -2,13 +2,16 @@ from pathlib import Path
 import storage
 class AppSettings():
     def __init__(self):
-        self.default_download_path = Path.home() / "Downloads" / "VenaApp"
+                      
+        path = Path.home() / "Downloads" / "VenaApp"
+        self.default_download_path = storage.get_setting('DEFAULT_DOWNLOAD_PATH') if storage.get_setting('DEFAULT_DOWNLOAD_PATH') is not None else path
 
 
         self.settings_dict = {
             'NAME': 'VenaApp',
             'VERSION': 'v2.0',
-            'DEFAULT_DOWNLOAD_PATH': f'{self.default_download_path}',
+            'DEFAULT_DOWNLOAD_PATH': f'{path}',
+            'ENABLE_TASKS_INDICATOR_POPUP': 'True',
             'MAX_CONCURRENT_DOWNLOADS': '5',
             'AUTO_RESUME_DOWNLOAD': 'False',
             'AUTO_START_APP_WITH_SYSTEM': 'True',

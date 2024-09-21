@@ -12,6 +12,7 @@ class SettingsWindow(QFrame):
         self.app_config = app.app_config
        
         self.default_download_path = storage.get_setting('DEFAULT_DOWNLOAD_PATH')
+        self.enable_tasks_indicator_popup = storage.get_setting('ENABLE_TASKS_INDICATOR_POPUP')
         self.max_concurrent_downloads = storage.get_setting('MAX_CONCURRENT_DOWNLOADS')
         self.auto_resume_download = storage.get_setting('AUTO_RESUME_DOWNLOAD')
         self.language = storage.get_setting('LANGUAGE')
@@ -98,6 +99,7 @@ class SettingsWindow(QFrame):
     def return_settings_to_default(self):
         self.general_settings.download_path.setText(self.app_config.settings_dict['DEFAULT_DOWNLOAD_PATH'])
         self.general_settings.auto_start.setChecked(self.app_config.settings_dict['AUTO_START_APP_WITH_SYSTEM'].strip().lower()== 'true')
+        self.general_settings.tasks_popup.setChecked(self.app_config.settings_dict['ENABLE_TASKS_INDICATOR_POPUP'].strip().lower()== 'true')
 
         self.management_settings.simultaneous_spin.setValue(int(self.app_config.settings_dict['MAX_CONCURRENT_DOWNLOADS'].strip()))
         self.management_settings.resume_pause.setChecked(self.app_config.settings_dict['AUTO_RESUME_DOWNLOAD'].strip().lower()== 'true')
@@ -193,7 +195,8 @@ class SettingsTobBar(QFrame):
 class General(QFrame):
     def __init__(self, master):
         super().__init__()    
-       # General Settings Tab
+       # General Settings Tab enable_tasks_indicator_popup
+        self.master = master 
         general_layout = QVBoxLayout()
         general_layout.setContentsMargins(0, 0, 0, 0)   
         general_layout.setSpacing(0)
@@ -218,6 +221,14 @@ class General(QFrame):
         state = master.auto_start_with_system.strip().lower() == 'true'
         self.auto_start.setChecked(state)
         self.auto_start.stateChanged.connect(self.auto_start_app)
+
+        self.tasks_popup = QCheckBox("Enable Tasks Indicator Popup")
+        
+        popup_state = master.enable_tasks_indicator_popup.strip().lower() == 'true'
+        self.tasks_popup.setChecked(popup_state)
+        self.tasks_popup.stateChanged.connect(self.change_state_tasks_popup)
+
+        general_layout.addWidget(self.tasks_popup)
         general_layout.addWidget(self.auto_start)
         self.browser_combo = QComboBox()
         self.browser_combo.addItems(["Chrome", "Firefox", "Edge", "Safari"])
@@ -258,11 +269,14 @@ class General(QFrame):
                 padding 10px 0 10px 0;
                 height: 40px;
             }
+            QCheckBox{
+                margin: 15px 0;
+            }
             #frame1{
-                margin-bottom: 20px;
+                margin-bottom: 10px;
             }
              #frame2{
-                margin-top: 20px;
+                margin-top: 10px;
             }
 
         """)
@@ -274,11 +288,20 @@ class General(QFrame):
         else:
         
            storage.insert_setting('AUTO_START_APP_WITH_SYSTEM', 'False')
+
+    def change_state_tasks_popup(self, state):
+        print(state)
+        if state == 0:
+            storage.insert_setting('ENABLE_TASKS_INDICATOR_POPUP', 'False')
+        else:
+            storage.insert_setting('ENABLE_TASKS_INDICATOR_POPUP', 'True')
+
     def choose_directory(self):
         folder = QFileDialog.getExistingDirectory(self, "Select Download Folder")
         if folder:
             self.download_path.setText(str(folder))
-            storage.insert_setting('DEFAULT_DOWNLOAD_PATH', folder)
+            self.master.app_config.default_download_path = str(folder)
+            storage.insert_setting('DEFAULT_DOWNLOAD_PATH', str(folder))
 
 class DownloadManagement(QFrame):
     def __init__(self, master):
@@ -400,6 +423,7 @@ class UserPreferences(QFrame):
 
         preferences_layout = QVBoxLayout()
         language_combo = QComboBox()
+        language_combo.setDisabled(True)
         language_combo.addItems(["English", "Swahili", "Hindu"])
         language_layout = QHBoxLayout()
         language_layout_frame = QFrame()
@@ -408,6 +432,7 @@ class UserPreferences(QFrame):
         language_layout.addWidget(language_combo)
         preferences_layout.addWidget(language_layout_frame)
         theme_combo = QComboBox()
+        theme_combo.setDisabled(True)
         theme_combo.addItems(["Light", "Dark", "System"])
         theme_layout = QHBoxLayout()
         theme_layout_frame = QFrame()

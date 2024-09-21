@@ -47,7 +47,7 @@ class TaskManager():
     async def append_file_details_to_storage(self, filename, path, address, date):
         # Append file details to storage
         if not path:
-            path = str(AppSettings().default_download_path)
+            path = str(self.parent.app_config.default_download_path)
             
         await asyncio.to_thread(self.parent.add_download_to_list ,filename, address, path, date)
         await asyncio.to_thread(storage.add_data,filename,address, '---', '---', 'Waiting...', date, path)
