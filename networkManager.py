@@ -14,13 +14,19 @@ class NetworkManager:
        
         # Default headers to mimic a browser's behavior
         self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Linux; Android 8.0.0; SM-G955U Build/R16NW) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
             'Accept-Language': 'en-US,en;q=0.9',
-            'Accept-Encoding': 'identity;q=1, *;q=0',
+            'Accept-Encoding': 'gzip, deflate, br, zstd',
             'Connection': 'keep-alive',
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
+            'Pragma': 'no-cache',
+            'sec-ch-ua-mobile':'?1',
+            'sec-ch-ua-platform':"Android",
+            'sec-fetch-dest':'empty',
+            'sec-fetch-mode':'cors',
+            'sec-fetch-site': 'same-origin',
+            'DNT': '1',  # Optionally add this
+            'Cache-Control': 'max-age=0',
         }
 
         logging.basicConfig(level=logging.INFO)
@@ -68,7 +74,7 @@ class NetworkManager:
             'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:90.0) Gecko/20100101 Firefox/90.0'
         ]  
 
-        print('---------------------segment-----------------------------')      
+       
         segment_path = Path(f"{Path().home()}/.venaApp/temp/.{os.path.basename(filename)}")
         segment_path.mkdir(parents=True, exist_ok=True)
         segment_filename = segment_path / f'part{segment_id}'
@@ -89,7 +95,7 @@ class NetworkManager:
         while retry_attempts < max_retries and not success:
             try:
                 headers = self.headers.copy()
-                headers['User-Agent'] = random.choice(user_agents)
+                ##headers['User-Agent'] = random.choice(user_agents)
                 headers['Referer'] = self.other_methods.get_base_url(address)
                 
                 if segment_start is not None and segment_end is not None:

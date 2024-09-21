@@ -209,17 +209,6 @@ class DownloadIndicator(QWidget):
         y = screen_geometry.height() - self.height() - 70  # 70 px from the bottom
         self.move(x, y)
 
-    
-
-
-        
-
-
-        
-        
-        
-
-    
 
     def mousePressEvent(self, event):
         """Override to capture the position of the window when the user clicks."""
