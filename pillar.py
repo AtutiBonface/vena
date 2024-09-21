@@ -758,6 +758,10 @@ class FileItemWidget(QFrame):
     def __init__(self,app, filename,path, file_size, downloaded,status, percentage, speed,modified_date):
         super().__init__()
         self.app = app
+        if 'downloading' in status.lower().strip() or 'resuming' in status.lower().strip():
+            status = 'Paused.'
+
+
 
         self.is_selected = False
         self.file_path = path
@@ -789,10 +793,13 @@ class FileItemWidget(QFrame):
 
         self.details_layout = QHBoxLayout()
         self.download_status = QLabel(f"{status}")
+        
+        if not '---' in percentage and 'paused' in status.lower().strip():
+            self.download_status.setText(f'{status} {percentage}')
         self.download_status.setObjectName('status')
         self.download_info = QLabel(f"[ {downloaded} / {file_size} ]")
         self.download_info.setObjectName("info")
-        self.download_speed = QLabel(f"{speed}")
+        self.download_speed = QLabel('')
         self.download_speed.setObjectName('speed')
         self.download_failed = QPushButton('retry')
         self.download_failed.setObjectName('retry')
@@ -972,10 +979,10 @@ class FileItemWidget(QFrame):
             }
             #retry {
                 max-width: 60px;
-                color: grey;
+                color: orange;
             }
             #retry:hover {
-                color: #e0e0e0;
+                color: #48D1CC;
             }
         """
     
@@ -1005,20 +1012,28 @@ class FileItemWidget(QFrame):
             self.download_status.setText(f"{status} ")
             if self.download_failed.isVisible():
                 self.details_layout.removeWidget(self.download_failed)   
-        elif 'failed' in status.lower():
+                self.download_failed.setParent(None)
+        elif 'failed' in status.lower():           
             self.download_status.setText(f"Failed!") 
             self.details_layout.removeWidget(self.modified_label)                       
             self.details_layout.addWidget(self.download_failed) 
             self.details_layout.addWidget(self.modified_label)
             self.download_failed.clicked.connect(self.retry_downloading)
         else:
-            self.download_status.setText(f"{status} {percentage}")
+            if not '---' in percentage:
+                self.download_status.setText(f"{status} {percentage}")
+            else:
+                self.download_status.setText(f"{status}")
+            if self.download_failed.isVisible():
+                self.details_layout.removeWidget(self.download_failed) 
         # Update download speed
-        if not speed == '0':
+        if not speed.strip() == '0' or not speed.strip() == '' or not speed.strip() == '---':
             self.download_speed.setText(f"{speed}")
         else:
             self.download_speed.setText(f"")
         # Update modified date
+        
+
         self.modified_label.setText(modified_date)
 
     def retry_downloading(self):        
