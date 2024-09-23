@@ -227,6 +227,8 @@ class MainApplication(QMainWindow):
             async for message in websocket:
                 if message:
                     data = json.loads(message) 
+
+                    
                                  
                     count = int(data['count'])
                     digit = 1
@@ -239,6 +241,10 @@ class MainApplication(QMainWindow):
                         for file in data['files']:
                             url = file['link']
                             filename = file['name'] 
+
+                            cookies = file.get('cookies', None)
+
+                            print(cookies)
                             # Create the top window only once
                             self.add_link_top_window = AddLink(app=self, url=url, filename=filename, task_manager=self.task_manager)                               
                             self.add_link_top_window.show()                  

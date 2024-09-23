@@ -7,7 +7,7 @@ from pathlib import Path
 from urllib.parse import urlparse , urlunparse ,urlsplit
 from qasync import asyncSlot
 class AddLink(QWidget):
-    def __init__(self, app= None, url=None ,filename=None, task_manager=None):
+    def __init__(self, app= None, url=None ,filename=None,cache = None, task_manager=None):
         super().__init__()
         self.setWindowTitle("Download file")
         self.setWindowIcon(QIcon('images/main.ico'))
@@ -16,6 +16,7 @@ class AddLink(QWidget):
         self.app_settings = AppSettings()
         self.indicator = app.show_less_popup
         self.app = app
+        self.cache = cache
         self.task_manager = task_manager
         self.download_path = str(self.app_settings.default_download_path)
 
@@ -242,7 +243,7 @@ class AddLink(QWidget):
                     self.selected_link = link
                     
                     ## adds link filename and path if selected to a queue
-                    await self.task_manager.addQueue((link, filename, self.selected_path))
+                    await self.task_manager.addQueue((link, filename, self.selected_path, self.cache))
                     
                     if self.task_manager.is_downloading:
                         

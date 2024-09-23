@@ -34,7 +34,7 @@ class NetworkManager:
         self.ssl_context = ssl.create_default_context(cafile=certifi.where())  # SSL context to use certifi's certificates
 
     async def create_session(self, connector):       
-        return aiohttp.ClientSession(connector=connector, headers=self.headers, timeout=aiohttp.ClientTimeout(total=10))  # Create an aiohttp session with a custom connector and headers
+        return aiohttp.ClientSession(connector=connector, headers=self.headers, timeout=aiohttp.ClientTimeout(total=60))  # Create an aiohttp session with a custom connector and headers
     
     async def fetch_m3u8_segment_size(self, session, url): # Fetch the size of a single m3u8 segment by checking the Content-Length header
         async with session.get(url) as response:

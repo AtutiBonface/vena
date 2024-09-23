@@ -44,7 +44,8 @@ class TaskManager():
             self.pause_events = defaultdict(asyncio.Event)
             self.paused_downloads = {}
             self.is_downloading = False
-    async def append_file_details_to_storage(self, filename, path, address, date):
+    async def append_file_details_to_storage(self, filename, path, address, cache, date):
+        print(cache)
         # Append file details to storage
         if not path:
             path = str(self.parent.app_config.default_download_path)
@@ -83,11 +84,11 @@ class TaskManager():
                 await self.condition.wait()           
             while not self.links_and_filenames.empty():
                 file = await self.links_and_filenames.get()
-                link, filename, path = file
+                link, filename, path, cache = file
                 if not filename in self.paused_downloads:## filename in paused downloads has path with it but if it does not exist it creates name together with path selected
                     filename = self.file_manager.validate_filename(filename, path)
                     name_with_no_path = os.path.basename(filename)
-                    await self.append_file_details_to_storage(name_with_no_path, path, link, time.strftime('%Y-%m-%d %H:%M')) 
+                    await self.append_file_details_to_storage(name_with_no_path, path, link, cache, time.strftime('%Y-%m-%d %H:%M')) 
                 file = (link, filename, path)                
                 async with self.file_semaphore:  # Limit concurrent file downloads
                     asyncio.create_task(self.start_task(file))
