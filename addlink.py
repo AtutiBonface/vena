@@ -154,6 +154,9 @@ class AddLink(QWidget):
                 margin: 0;
                 padding:0;
             }
+            QLineEdit{
+                color: black;
+            }
         """)
     def center_window(self):
         # Get the screen's geometry (size and position)

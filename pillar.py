@@ -244,9 +244,9 @@ class MainApplication(QMainWindow):
 
                             cookies = file.get('cookies', None)
 
-                            print(cookies)
+                            
                             # Create the top window only once
-                            self.add_link_top_window = AddLink(app=self, url=url, filename=filename, task_manager=self.task_manager)                               
+                            self.add_link_top_window = AddLink(app=self,cache=cookies, url=url, filename=filename, task_manager=self.task_manager)                               
                             self.add_link_top_window.show()                  
   
                 else:

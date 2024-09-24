@@ -425,6 +425,7 @@ class OtherMethods():
             QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
                 background: none;
             }
+           
             
             
         """
