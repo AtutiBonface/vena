@@ -349,7 +349,13 @@ class OtherMethods():
             *{
                 padding: 0;
                 margin: 0;
-            }           
+                
+               
+            }  
+            QPushButton{
+                background-color: transparent;
+                border: none;
+            }         
             #hero{
                 background-color: #e2e7eb;
                 margin: 0;

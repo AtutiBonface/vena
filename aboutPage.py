@@ -71,7 +71,7 @@ class AboutWindow(QFrame):
         logo_label = QLabel()
 
         logo_pixmap = QPixmap('images/main.ico')  # Create a placeholder pixmap
-        logo_pixmap = logo_pixmap.scaled(60, 60)  # Make it transparent
+        logo_pixmap = logo_pixmap.scaled(30, 30)  # Make it transparent
         logo_label.setPixmap(logo_pixmap)
         logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         scroll_layout.addWidget(logo_label)
@@ -79,7 +79,7 @@ class AboutWindow(QFrame):
         # App Overview
         overview_label = QLabel("VenaApp: Fast, Simple, Efficient Download Manager")
         overview_label.setObjectName('title')
-        overview_label.setFont(QFont("Arial", 16, QFont.Weight.Bold))
+        overview_label.setFont(QFont("Arial", 14, QFont.Weight.Bold))
         overview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         scroll_layout.addWidget(overview_label)
 
@@ -96,7 +96,7 @@ class AboutWindow(QFrame):
         # Features
         features_label = QLabel("Key Features:")
         features_label.setObjectName('title')
-        features_label.setFont(QFont("Arial", 15, QFont.Weight.Bold))
+        features_label.setFont(QFont("Arial", 13, QFont.Weight.Bold))
         scroll_layout.addWidget(features_label)
 
         features = [
@@ -114,7 +114,7 @@ class AboutWindow(QFrame):
         # Version Information
         version_label = QLabel("Version Information")
         version_label.setObjectName('title')
-        version_label.setFont(QFont("Arial", 15, QFont.Weight.Bold))
+        version_label.setFont(QFont("Arial", 13, QFont.Weight.Bold))
         scroll_layout.addWidget(version_label)
 
         version_info = QLabel("VenaApp: v2.1.0\nBrowser Extension: v2.0.0")
@@ -123,7 +123,7 @@ class AboutWindow(QFrame):
         # Team/Developer Credits
         team_label = QLabel("The Team Behind VenaApp")
         team_label.setObjectName('title')
-        team_label.setFont(QFont("Arial", 15, QFont.Weight.Bold))
+        team_label.setFont(QFont("Arial", 13, QFont.Weight.Bold))
         scroll_layout.addWidget(team_label)
 
         team_info = QLabel(
@@ -138,7 +138,7 @@ class AboutWindow(QFrame):
         # Support and Contact
         support_label = QLabel("Support and Contact")
         support_label.setObjectName('title')
-        support_label.setFont(QFont("Arial", 15, QFont.Weight.Bold))
+        support_label.setFont(QFont("Arial", 13, QFont.Weight.Bold))
         scroll_layout.addWidget(support_label)
 
         support_info = QLabel(

@@ -111,6 +111,9 @@ class DeletionConfirmationWindow(QDialog):
         self.setLayout(main_layout)
 
         self.setStyleSheet("""
+            DeletionConfirmationWindow{
+                background-color: #e2e7eb;
+            }
             QPushButton{
                 height: 40px;
                 max-width : 120px;
