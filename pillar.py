@@ -49,7 +49,6 @@ class MainApplication(QMainWindow):
 
     def setup_styles(self):
         self.xe_images =Images()
-        self.colors = Colors()
         self.setStyleSheet(self.other_methods.get_qss())
 
     def setup_data(self):
@@ -143,6 +142,9 @@ class MainApplication(QMainWindow):
         """ Quit the application from the system tray icon menu """
         if self.add_link_top_window is not None:
             self.add_link_top_window.close()
+        if self.show_less_popup.isVisible():
+            self.show_less_popup.close()        
+        self.loop.stop()
         QApplication.quit()
 
     def on_tray_icon_activated(self, reason):
@@ -444,7 +446,24 @@ class MainApplication(QMainWindow):
         self.previously_clicked_file = None             
         storage.clear_download_finished()        
         self.complete_file_widgets = {}
-        
+
+    def clear_failed_files_plus_their_widgets(self):       
+        failed_files = []
+        if self.file_list_stacked_widget.currentIndex() == 1:
+            self.switch_filelist_page(0)
+        for filename , details in self.xengine_downloads.items():
+            if 'failed' in details['status'].lower():
+                failed_files.append(filename)
+
+        for name , widget in self.active_file_widgets.items():
+            if name in failed_files:
+                self.file_list.file_layout.removeWidget(widget)
+                widget.setParent(None)
+
+        self.previously_clicked_btn = None
+        self.previously_clicked_file = None             
+        storage.clear_download_failed()        
+        #self.active_file_widgets = {}
           
 
 class TopBar(QFrame):
@@ -1139,12 +1158,16 @@ class CustomTitleBar(QFrame):
         add_action = self.menu.addAction(QIcon("images/add-link.png"), "Add Multiple Links")
         clear_action = self.menu.addAction(QIcon("images/clean.png"), "Clear Finished")
         delete_action = self.menu.addAction(QIcon("images/remove.png"), "Delete Selected")
+        clear_failed_action = self.menu.addAction(QIcon("images/clean.png"), "Clear Failed!")
 
         
 
         add_action.triggered.connect(self.add_links)
         clear_action.triggered.connect(self.clear_finished)
         delete_action.triggered.connect(self.delete_selected)
+        clear_failed_action.triggered.connect(self.clear_failed)
+
+
        
 
         # Set the menu for the dropdown button
@@ -1211,7 +1234,7 @@ class CustomTitleBar(QFrame):
             QMenu {
                 width: 200px;
                 padding: 5px;
-                height: 150px;
+                height: 180px;
                 border-radius: 5px;
                 background-color: #48D1CC;
             }
@@ -1267,6 +1290,9 @@ class CustomTitleBar(QFrame):
 
     def clear_finished(self):
         self.parent.clear_displayed_files_widgets()
+
+    def clear_failed(self):
+        self.parent.clear_failed_files_plus_their_widgets() 
 
     def delete_selected(self):
        if self.parent.details_of_file_clicked:

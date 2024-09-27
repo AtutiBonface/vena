@@ -1,4 +1,3 @@
-from PIL import Image
 from pathlib import Path
 import os, sys, logging
 from urllib.parse import urljoin, urlparse, urlunparse 
@@ -35,7 +34,7 @@ class Images():
         self.video = self.resource_path('images/video.png')
         self.image = self.resource_path('images/image.png')
 
-        self.logo = Image.open('images/main.ico')
+        self.logo = self.resource_path('images/main.ico')
 
 
 class DownloadingIndicatorBox():

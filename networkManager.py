@@ -92,76 +92,80 @@ class NetworkManager:
         if segment_filename.exists():
             segment_downloaded = segment_progress['downloaded']
         
-        while retry_attempts < max_retries and not success:
-            try:
-                headers = self.headers.copy()
-                ##headers['User-Agent'] = random.choice(user_agents)
-                headers['Referer'] = self.other_methods.get_base_url(address)
+        try:
+            while retry_attempts < max_retries and not success:
+                try:
+                    headers = self.headers.copy()
+                    ##headers['User-Agent'] = random.choice(user_agents)
+                    headers['Referer'] = self.other_methods.get_base_url(address)
+                    
+                    if segment_start is not None and segment_end is not None:
+                        if segment_downloaded > 0:
+                            segment_start = segment_start + segment_downloaded
+                        if segment_start < segment_end:
+                            headers['Range'] = f'bytes={segment_start}-{segment_end}'
+                        else:
+                            return True
+                    elif segment_start is None and segment_end is None:
+                        if segment_downloaded > 0:
+                            headers['Range'] = f'bytes={segment_downloaded}-'
+                        else:
+                            headers.pop('Range', None)
+
+                    async with session.get(address, headers=headers) as response:
+                        if response.status in (206, 200):
+                            async with aiofiles.open(segment_filename, 'ab') as file:
+                                async for chunk in response.content.iter_chunked(self.config.CHUNK_SIZE):
+                                    pause_event = self.task_manager._get_or_create_pause_event(filename)
+                                    if not pause_event.is_set(): 
+                                        async with segment_tracker.segment_lock:                                                                    
+                                            await segment_tracker.save_progress()
+                                        self.paused = True
+                                        raise DownloadPausedError('segment-paused')
+                                    
+                                    await file.write(chunk)
+                                    chunk_size = len(chunk)
+                                    segment_downloaded += chunk_size
+                                
+                                    async with segment_tracker.segment_lock:   
+                                        segment_tracker.update_segment(segment_id, segment_downloaded, segment_total)
+                                    
+                                    async with self.task_manager.file_locks[segment_filename]:
+                                        if filename in self.task_manager.size_downloaded_dict:
+                                            self.task_manager.size_downloaded_dict[filename][0] += len(chunk)
+                                        else:
+                                            self.task_manager.size_downloaded_dict[filename] = [len(chunk), time.time()]
+                                    await self.task_manager.progress_manager._handle_segments_downloads_ui(filename, address, total_filesize)
+
+                            async with segment_tracker.segment_lock:      
+                                await segment_tracker.save_progress()
+                            success = True
+                            return True
+                        else:
+                            retry_attempts += 1
+                            await asyncio.sleep(retry_attempts * 2 + random.uniform(0.5, 1.5))
+                except asyncio.CancelledError:
+                    raise
                 
-                if segment_start is not None and segment_end is not None:
-                    if segment_downloaded > 0:
-                        segment_start = segment_start + segment_downloaded
-                    if segment_start < segment_end:
-                        headers['Range'] = f'bytes={segment_start}-{segment_end}'
-                    else:
-                        return True
-                elif segment_start is None and segment_end is None:
-                    if segment_downloaded > 0:
-                        headers['Range'] = f'bytes={segment_downloaded}-'
-                    else:
-                        headers.pop('Range', None)
-
-                async with session.get(address, headers=headers) as response:
-                    if response.status in (206, 200):
-                        async with aiofiles.open(segment_filename, 'ab') as file:
-                            async for chunk in response.content.iter_chunked(self.config.CHUNK_SIZE):
-                                pause_event = self.task_manager._get_or_create_pause_event(filename)
-                                if not pause_event.is_set(): 
-                                    async with segment_tracker.segment_lock:                                                                    
-                                        await segment_tracker.save_progress()
-                                    self.paused = True
-                                    raise DownloadPausedError('segment-paused')
-                                
-                                await file.write(chunk)
-                                chunk_size = len(chunk)
-                                segment_downloaded += chunk_size
-                            
-                                async with segment_tracker.segment_lock:   
-                                    segment_tracker.update_segment(segment_id, segment_downloaded, segment_total)
-                                
-                                async with self.task_manager.file_locks[segment_filename]:
-                                    if filename in self.task_manager.size_downloaded_dict:
-                                        self.task_manager.size_downloaded_dict[filename][0] += len(chunk)
-                                    else:
-                                        self.task_manager.size_downloaded_dict[filename] = [len(chunk), time.time()]
-                                await self.task_manager.progress_manager._handle_segments_downloads_ui(filename, address, total_filesize)
-
-                        async with segment_tracker.segment_lock:      
-                            await segment_tracker.save_progress()
-                        success = True
-                        return True
-                    else:
+                except Exception as e:
+                    if not str(e).startswith('segment-paused'):            
                         retry_attempts += 1
                         await asyncio.sleep(retry_attempts * 2 + random.uniform(0.5, 1.5))
-            except asyncio.CancelledError:
-                async with segment_tracker.segment_lock:      
-                    await segment_tracker.save_progress()
-                return False  
-            
-            except Exception as e:
-                if not str(e).startswith('segment-paused'):            
-                    retry_attempts += 1
-                    await asyncio.sleep(retry_attempts * 2 + random.uniform(0.5, 1.5))
-                    self.paused = False
-                    if retry_attempts == 4:
-                        raise SegmentDownloadError('Failed')
-                else:
-                    raise DownloadPausedError('Paused')
+                        self.paused = False
+                        if retry_attempts == 4:
+                            raise SegmentDownloadError('Failed')
+                    else:
+                        raise DownloadPausedError('Paused')
 
-        if not self.paused:
-            raise SegmentDownloadError('Failed')
-        else:
-            raise DownloadPausedError('Paused')
+            if not self.paused:
+                raise SegmentDownloadError('Failed')
+            else:
+                raise DownloadPausedError('Paused')
+        finally:
+            async with segment_tracker.segment_lock:      
+               await segment_tracker.save_progress()
+
+        
 
 class SegmentDownloadError(Exception):
     """Custom exception raised when a segment fails to download after retries."""

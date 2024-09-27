@@ -92,7 +92,13 @@ def clear_download_finished():
     cursor.execute('''DELETE FROM downloads WHERE  status = ?''', ('Finished.',))
     conn.commit()
     conn.close()
-
+def clear_download_failed():
+    conn = sqlite3.connect(location)
+    cursor = conn.cursor()
+    cursor.execute('''DELETE FROM downloads WHERE LOWER(status) LIKE ?''', ('%failed%',))
+    conn.commit()
+    conn.close()
+    
 def delete_individual_file(filename):
     conn = sqlite3.connect(location)
     cursor = conn.cursor()

@@ -1,8 +1,9 @@
-import os, asyncio,aiohttp, ssl, certifi, time, threading, re
-from asyncio import Queue 
-from settings import AppSettings
+import os, asyncio,aiohttp, ssl, certifi, time
+from asyncio import Queue
+
+from websockets import ConnectionClosedOK 
 import  storage
-import shutil, m3u8
+import  m3u8
 from venaUtils import OtherMethods
 from urllib.parse import urlparse, urlunparse, urljoin
 from fileManager import FileManager
@@ -373,3 +374,41 @@ class TaskManager():
                     return  # Exit if still paused
 
         return await self.network_manager.download_m3u8_media_plus_in_segments(session, filename, url, headers, filestart, fileend, seg_no, segment_size, file_size)
+
+
+    
+
+    async def shutdown(self):
+        print('-------------shutting--------------')
+        await self.graceful_shutdown()       
+        await asyncio.sleep(0.5)
+
+    async def graceful_shutdown(self):
+        print("Initiating graceful shutdown...")
+        # Cancel all running tasks
+        tasks = [task for task in asyncio.all_tasks() if task is not asyncio.current_task()]
+        for task in tasks:
+            task.cancel()
+
+        # Wait for all tasks to complete
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Handle exceptions
+        for result in results:
+            if isinstance(result, Exception) and not isinstance(result, (asyncio.CancelledError, ConnectionClosedOK)):
+                print(f"Error during shutdown: {result}")
+
+        # Save progress for all downloads
+        await self.save_all_progress()
+
+        print("All tasks cancelled and progress saved.")
+
+    async def save_all_progress(self):
+        print("Saving progress for all downloads...")       
+        for filename, tracker in self.segment_trackers.items():
+            try:
+                async with tracker.segment_lock:
+                    await tracker.save_progress()
+            except Exception as e:
+                print(f"Error saving progress for {filename}: {e}")
+        print("All progress saved.")
