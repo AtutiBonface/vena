@@ -11,7 +11,7 @@ class AddLink(QWidget):
         super().__init__()
         self.setWindowTitle("Download file")
         self.setWindowIcon(QIcon('images/main.ico'))
-        self.setGeometry(150, 150, 400, 220)
+        self.setGeometry(150, 150, 450, 220)
         self.center_window()
         self.app_settings = AppSettings()
         self.indicator = app.show_less_popup

@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QFrame, QStackedWidget,QSystemTrayIcon,QMenu
 )
 from venaWorker import Worker, SetAppTray
-from PyQt6.QtGui import QIcon, QAction, QFont
+from PyQt6.QtGui import QIcon, QAction, QFont,QFontMetrics
 from PyQt6.QtCore import Qt, QPoint,QSize ,QThread, QEvent
 from addlink import AddLink
 from qasync import asyncSlot
@@ -145,6 +145,7 @@ class MainApplication(QMainWindow):
         if self.show_less_popup.isVisible():
             self.show_less_popup.close()        
         self.loop.stop()
+
         QApplication.quit()
 
     def on_tray_icon_activated(self, reason):
@@ -228,10 +229,7 @@ class MainApplication(QMainWindow):
         try:
             async for message in websocket:
                 if message:
-                    data = json.loads(message) 
-
-                    
-                                 
+                    data = json.loads(message)              
                     count = int(data['count'])
                     digit = 1
                     if count > 1:
@@ -246,6 +244,9 @@ class MainApplication(QMainWindow):
 
                             cookies = file.get('cookies', None)
 
+                            if cookies is not None:
+                                cookies = self.other_methods.format_cookies(cookies)
+                            
                             
                             # Create the top window only once
                             self.add_link_top_window = AddLink(app=self,cache=cookies, url=url, filename=filename, task_manager=self.task_manager)                               
@@ -264,7 +265,7 @@ class MainApplication(QMainWindow):
     def load_downloads_from_db(self):
         all_downloads = storage.get_all_data()
         for download in all_downloads:
-            id, filename, address, filesize, downloaded, status, percentage,modification_date, path = download
+            id, filename, address, filesize, downloaded, status, percentage,modification_date, path, cookies = download
             self.xengine_downloads[filename] = {
                 'url': address,
                 'status': status,
@@ -272,11 +273,12 @@ class MainApplication(QMainWindow):
                 'filesize': filesize,
                 'modification_date': modification_date,
                 'path': path,
-                'percentage': percentage
+                'percentage': percentage,
+                'cookies': cookies
             }
 
     # File management methods
-    def add_download_to_list(self, filename, address, path, date):        
+    def add_download_to_list(self, filename, address, path, date, cookies):        
         self.xengine_downloads[filename] = {
             'url': address,
             'status': 'Waiting..',
@@ -284,7 +286,8 @@ class MainApplication(QMainWindow):
             'filesize': '---',
             'modification_date': date,
             'path': path,
-            'percentage' : '0%'
+            'percentage' : '0%',
+            'cookies': cookies
         }
         self.update_queue.put((filename, 'Waiting..', '---','---','---','---', date))
     
@@ -379,12 +382,19 @@ class MainApplication(QMainWindow):
         self.load_downloads_from_db()## reasign values to xengine_downloads to get updated values for downloaded chuck
         self.downloaded_chuck = 0
         self.file_size = 0
+        exclude_statuses = ['finished', 'waiting', 'resuming']
         for name , details in self.xengine_downloads.items():
-            if name == f_name and not ('finished' in details['status'].lower() or details['percentage'] == '100.0%'):
+                            
+            # Check if the download should be resumed based on status and progress
+            if name == f_name and not (
+                any(status in details['status'].lower() for status in exclude_statuses) or 
+                details['percentage'] == '100.0%'
+            ):                
                 self.downloaded_chuck = safe_int(details.get('downloaded', 0))
-                self.file_size = safe_int(details.get('filesize', 0))              
-    
-                asyncio.run_coroutine_threadsafe(self.task_manager.resume_downloads_fn(filename_with_path,  details['url'], self.downloaded_chuck)  ,self.loop)
+                self.file_size = safe_int(details.get('filesize', 0))    
+                cookies = details.get('cookies', None)          
+                
+                asyncio.run_coroutine_threadsafe(self.task_manager.resume_downloads_fn(filename_with_path,  details['url'], self.downloaded_chuck, cookies)  ,self.loop)
         
     def update_filename(self, old_name, new_name):     
         pathless_old_name = os.path.basename(old_name)
@@ -812,7 +822,10 @@ class FileItemWidget(QFrame):
         text_layout.setContentsMargins(0, 0, 0, 0)
         
         # Filename (top row)
-        self.filename_label = QLabel(filename)
+        #self.filename_label = QLabel(filename)
+        self.filename_label = QLabel(self.get_elided_text(filename, 600))
+        self.filename_label.setWordWrap(False)  # Ensure text does not wrap
+
         text_layout.addWidget(self.filename_label)
         text_layout.setObjectName("filename")
 
@@ -906,6 +919,11 @@ class FileItemWidget(QFrame):
         if not self.is_selected:
             self.setStyleSheet(self.get_normal_style())
         super().leaveEvent(event)
+
+    def get_elided_text(self, text, max_width):
+        """Returns the elided text if it exceeds the max width."""
+        font_metrics = QFontMetrics(self.font())
+        return font_metrics.elidedText(text, Qt.TextElideMode.ElideRight, max_width)
     def mousePressEvent(self, event):
         """Triggered when the widget is clicked."""
         if self.app.previously_clicked_btn:
@@ -1013,7 +1031,7 @@ class FileItemWidget(QFrame):
     
     def update_filename(self, new_name):
         new_name = os.path.basename(new_name)
-        self.filename_label.setText(new_name)
+        self.filename_label.setText(self.get_elided_text(new_name, 150))
         self.image = self.other_methods.return_file_type(new_name)
         self.icon_label.setPixmap(QIcon(self.other_methods.resource_path(self.image)).pixmap(20, 20))
 
@@ -1038,12 +1056,14 @@ class FileItemWidget(QFrame):
             if self.download_failed.isVisible():
                 self.details_layout.removeWidget(self.download_failed)   
                 self.download_failed.setParent(None)
+            self.download_speed.setText(f"")
         elif 'failed' in status.lower():           
             self.download_status.setText(f"Failed!") 
             self.details_layout.removeWidget(self.modified_label)                       
             self.details_layout.addWidget(self.download_failed) 
             self.details_layout.addWidget(self.modified_label)
             self.download_failed.clicked.connect(self.retry_downloading)
+            self.download_speed.setText(f"")
         else:
             if not '---' in percentage:
                 self.download_status.setText(f"{status} {percentage}")
@@ -1052,10 +1072,10 @@ class FileItemWidget(QFrame):
             if self.download_failed.isVisible():
                 self.details_layout.removeWidget(self.download_failed) 
         # Update download speed
-        if not speed.strip() == '0' or not speed.strip() == '' or not speed.strip() == '---':
-            self.download_speed.setText(f"{speed}")
-        else:
+        if  speed.strip() == '0' or  speed.strip() == '' or  speed.strip() == '---':
             self.download_speed.setText(f"")
+        else:
+            self.download_speed.setText(f"{speed}")
         # Update modified date
         
 

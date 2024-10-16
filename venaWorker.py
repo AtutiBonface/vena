@@ -6,6 +6,8 @@ from PyQt6.QtWidgets import QMenu, QSystemTrayIcon
 from PyQt6.QtGui import QIcon,QAction
 from collections import defaultdict
 import asyncio
+import aiosqlite
+
 class Worker(QObject):
     update_signal = pyqtSignal(str, str, str, str,str, str, str)
 
@@ -77,4 +79,78 @@ class SetAppTray():
         self.tray_icon_menu.addAction(self.restore_action)
         self.tray_icon_menu.addAction(self.quit_action)
         self.tray_icon.setContextMenu(self.tray_icon_menu)
+
+class SQLiteProgressTracker:
+    def __init__(self, ):
+        self.parent_path = Path().home() / '.venaApp' / 'dbs'
+        self.db_path = Path(os.path.join(self.parent_path, 'progress.db'))
         
+
+    async def init_db(self):
+        try:
+            if not  self.db_path.parent.exists():
+                self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            pass
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute('''
+                CREATE TABLE IF NOT EXISTS segment_progress
+                (filename TEXT, segment_id INTEGER, downloaded INTEGER, total INTEGER,
+                PRIMARY KEY (filename, segment_id))
+            ''')
+            await db.commit()
+
+    async def update_segment(self, filename, segment_id, downloaded, total):
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute('''
+                INSERT OR REPLACE INTO segment_progress
+                (filename, segment_id, downloaded, total)
+                VALUES (?, ?, ?, ?)
+            ''', (filename, segment_id, downloaded, total))
+            await db.commit()
+
+    async def get_segment_progress(self, filename, segment_id):
+        async with aiosqlite.connect(self.db_path) as db:
+            async with db.execute('''
+                SELECT downloaded, total FROM segment_progress
+                WHERE filename = ? AND segment_id = ?
+            ''', (filename, segment_id)) as cursor:
+                row = await cursor.fetchone()
+                if row:
+                    return {'downloaded': row[0], 'total': row[1]}
+                return {'downloaded': 0, 'total': 0}
+
+    async def save_all_progress(self):
+        # This method is now a no-op as all changes are immediately saved to the database
+        pass
+
+    async def init_uuid_table(self):
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute('''
+                CREATE TABLE IF NOT EXISTS UUID
+                (id INTEGER PRIMARY KEY, filename TEXT, uuid TEXT)
+            ''')
+            await db.commit()
+    async def add_filename_plus_uuid(self, filename, uuid):
+        await self.init_uuid_table()
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute('''
+                INSERT INTO UUID
+                (filename, uuid)
+                VALUES (?, ?)
+            ''', (filename, uuid))
+            await db.commit()
+
+    async def get_uuid_for_filename(self, filename):
+        await self.init_uuid_table()
+        async with aiosqlite.connect(self.db_path) as db:
+            async with db.execute('''
+                SELECT uuid FROM UUID
+                WHERE filename = ?
+            ''', (filename,)) as cursor:
+                row = await cursor.fetchone()
+                if row:
+                    return row[0]
+                return None
+
+

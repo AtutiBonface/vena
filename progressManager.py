@@ -18,6 +18,8 @@ class ProgressManager:
         await asyncio.to_thread(storage.update_data, filename, address,size, downloaded, state, percentage,date)
 
     async def _handle_segments_downloads_ui(self,filename, link, total_size):
+
+        
         
         async with self.update_locks[filename]:
             current_time = time.time()
@@ -30,19 +32,20 @@ class ProgressManager:
 
                 total_downloaded, start_time = self.task_manager.size_downloaded_dict[filename]
 
-            unit_time = current_time - start_time
-            if total_downloaded > 0 and unit_time > 1:
-                down_in_mbs = total_downloaded / (1024 * 1024)
-                speed = down_in_mbs / unit_time
-                new_speed = round(speed, 3)
-                speed_str = self.other_methods.returnSpeed(new_speed)
-                percentage = round((total_downloaded / total_size) * 100, 0)
+                unit_time = current_time - start_time
+                print(f"total size is {filename} {total_size} {total_downloaded}")
+                if total_downloaded > 0 and unit_time > 1:
+                    down_in_mbs = total_downloaded / (1024 * 1024)
+                    speed = down_in_mbs / unit_time
+                    new_speed = round(speed, 3)
+                    speed_str = self.other_methods.returnSpeed(new_speed)
+                    percentage = round((total_downloaded / total_size) * 100, 0)
 
-                await self.update_file_details_on_storage_during_download(
-                    filename, link, total_size, total_downloaded, "Downloading..", speed_str, f"{percentage}%", time.strftime('%Y-%m-%d %H:%M')
-                )
+                    await self.update_file_details_on_storage_during_download(
+                        filename, link, total_size, total_downloaded, "Downloading..", speed_str, f"{percentage}%", time.strftime('%Y-%m-%d %H:%M')
+                    )
 
-                self.last_update_time[filename] = current_time
+                    self.last_update_time[filename] = current_time
     async def _update_progress(self,filename, link, size, downloaded_chunk, start_time):
 
         current_time = time.time()

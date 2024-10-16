@@ -47,9 +47,9 @@ class FileManager:
         return new_name
         # Implementation of validate_filename method
 
-    async def combine_segments(self, filename, link, size, num_segments):      
-        basename = os.path.basename(filename)
-        tem_folder = f"{Path().home()}/.venaApp/temp/.{basename}"
+    async def combine_segments(self, filename, link, size, num_segments, uuid):      
+       
+        tem_folder = f"{Path().home()}/.venaApp/temp/{uuid}"
 
         try:        
             async with aiofiles.open(filename, 'wb') as final_file:
@@ -106,7 +106,6 @@ class FileManager:
 
             await self.task_manager.progress_manager.update_file_details_on_storage_during_download(
                 filename, link, size, size, 'Finished.',speed,'', time.strftime('%Y-%m-%d %H:%M')
-
                 
             )
         

@@ -2,30 +2,37 @@ import sqlite3, os
 from pathlib import Path
 from venaUtils import ConfigFilesHandler
 
-path_to_data_base = Path().home() /'.venaApp'
+path_to_data_base = Path().home() /'.venaApp' / 'dbs'
 
-location = os.path.join(path_to_data_base, 'vena.db')
+location = Path(os.path.join(path_to_data_base, 'main.db'))
 
-def initiate_database():   
-    ConfigFilesHandler().create_config_file() 
+
+
+def initiate_database(): 
+    try:
+        if not location.parent.exists():
+            location.parent.mkdir(parents=True, exist_ok=True)
+    except:
+        pass
+
     conn = sqlite3.connect(location)
     cursor = conn.cursor()
 
     cursor.execute(''' CREATE TABLE IF NOT EXISTS downloads 
-                ( id INTEGER PRIMARY KEY, filename TEXT,address TEXT, filesize TEXT,downloaded TEXT, status TEXT, percentage TEXT,modification_date TEXT, path TEXT )''')
+                ( id INTEGER PRIMARY KEY, filename TEXT,address TEXT, filesize TEXT,downloaded TEXT, status TEXT, percentage TEXT,modification_date TEXT, path TEXT , cookies TEXT)''')
     conn.commit()
     conn.close()
 
 
 
-def add_data(filename, address,filesize, downloaded, status, modification_date, path):
+def add_data(filename, address,filesize, downloaded, status, modification_date, path, cookies):
     percentage = '---'
     conn2 = sqlite3.connect(location)
     cursor = conn2.cursor()
 
     cursor.execute(''' INSERT INTO downloads 
-                   (filename, address,filesize, downloaded,status, percentage ,modification_date, path) VALUES(?,?,?,?,?,?, ?, ?) ''', 
-                   (filename, address, filesize, downloaded, status,percentage, modification_date, path))
+                   (filename, address,filesize, downloaded,status, percentage ,modification_date, path, cookies) VALUES(?,?,?,?,?,?, ?, ?, ?) ''', 
+                   (filename, address, filesize, downloaded, status,percentage, modification_date, path, cookies))
     conn2.commit()
     conn2.close()
 

@@ -2,7 +2,8 @@ from pathlib import Path
 import os, sys, logging
 from urllib.parse import urljoin, urlparse, urlunparse 
 import ctypes, platform
-
+import time
+import uuid
 # Constants for Windows 11 rounded corners
 DWMWA_WINDOW_CORNER_PREFERENCE = 33
 DWMNCRP_ROUNDSMALL = 2
@@ -55,43 +56,18 @@ class ConfigFilesHandler:
 
         self.defaut_download_path = Path.home() / "Downloads" / "VenaApp"
 
+        self.database_paths = Path().home()  / ".venaApp" / "dbs"
+
     def create_config_file(self):
-        self.settings_config = [
-            "### Settings configuration for Vena ### \n",
-            "\n",
-            "*Note* Do not write or edit this file because your Vena Downloader will be faulty! Very faulty!\n",
-            "\n",
-            f"DEFAULT_DOWNLOAD_PATH <x:e> {self.defaut_download_path} \n",
-            "MAX_CONCURRENT_DOWNLOADS <x:e> 5 \n",
-            "AUTO_RESUME_DOWNLOAD <x:e> False \n",
-            "SHOW_PROGRESS_WINDOW <x:e> True \n",
-            "SHOW_DOWNLOAD_COMPLETE_WINDOW <x:e> True \n",
-            "\n",
-            "EXTENSIONS_LINK <x:e> https://vena.imaginekenya.site/addons\n",
-            "VERSION <x:e> Vena 2.0 \n",
-            "AUTO_START_APP_WITH_SYSTEM <x:e> False \n",
-            "DEFAULT_BROWSER <x:e> system_default \n",
-            "BANDWIDTH_THROTTLING <x:e> unlimited \n",
-            "DOWNLOAD_PRIORITY <x:e> normal \n",
-            "AUTO_RESUME_OF_PAUSE_OR_INTERRUPTED <x:e> True \n",
-            "ENABLE_BROWSER_EXTENSION <x:e> True \n",
-            "FILE_TYPE_ASSOCIATION <x:e> .mp4, .mp3, .mkv, .avi, .flv, .mov, .wmv, .wav, .aac, .ogg  \n",
-            "ENABLE_DOWNLOAD_CONFIRMATION_POPUPS <x:e> True \n",
-            "ENABLE_CONTEXT_MENU_OPTIONS <x:e> True \n",
-            "LANGUAGE <x:e> english \n",
-            "THEME <x:e> light \n"
-        ]
+        
 
         try:
            
             if not self.path_to_config_file.parent.exists():
                 self.path_to_config_file.parent.mkdir(parents=True, exist_ok=True)
 
-            # Check if the config file already exists
-            if not self.path_to_config_file.exists():
-                # Write the settings to the config file if it doesn't exist
-                with self.path_to_config_file.open('w') as f:
-                    f.writelines(self.settings_config)
+            if not self.database_paths.parent.exists():
+                self.database_paths.parent.mkdir(parents=True, exist_ok=True)
             
 
         except Exception as e:
@@ -102,7 +78,7 @@ class ConfigFilesHandler:
             logger.error(f"An error occurred: {e}")
 
 class OtherMethods():
-    def __init__(self) -> None:
+    def __init__(self) -> None:       
         
         self.video_extensions = {
             '.mp4', '.mkv', '.flv', '.avi', '.mov', '.wmv', '.webm', 
@@ -139,6 +115,13 @@ class OtherMethods():
         parsed_url = urlparse(url)
         base_url = urlunparse((parsed_url.scheme, parsed_url.netloc, '/', '', '', ''))
         return base_url
+    
+    
+
+    def generate_uuid(self):
+        # Generate a UUID4 (randomly generated)
+        unique_id = str(uuid.uuid4())  # Converts the UUID object to a string
+        return unique_id
     
     def returnSpeed(self, speed):
         # Convert speed to human-readable format
@@ -434,6 +417,43 @@ class OtherMethods():
             
             
         """
+    
+    def format_cookies(self, cookies):
+        formatted_cookies = ''
+        for cookie in cookies:            # Start building the cookie string
+            cookie_str = f"{cookie['name']}={cookie['value']}"
+            # Handle expiration date
+            if 'expirationDate' in cookie and cookie['expirationDate'] is not None:
+                # Convert expiration date from timestamp to GMT format
+                expiration_date = time.strftime('%a, %d %b %Y %H:%M:%S GMT', time.gmtime(cookie['expirationDate']))
+                cookie_str += f"; Expires={expiration_date}"
+
+            # Handle other attributes
+            if 'path' in cookie:
+                cookie_str += f"; Path={cookie['path']}"
+            
+            if 'domain' in cookie:
+                cookie_str += f"; Domain={cookie['domain']}"
+
+            if cookie.get('secure', False):
+                cookie_str += "; Secure"
+            
+            if cookie.get('httpOnly', False):
+                cookie_str += "; HttpOnly"
+            
+            if 'sameSite' in cookie and cookie['sameSite'] != 'unspecified':
+                cookie_str += f"; SameSite={cookie['sameSite']}"
+
+            # Handle session cookies
+            if cookie.get('session', False):
+                cookie_str += "; Session"
+
+            # You can add other keys here if necessary
+
+            formatted_cookies += cookie_str
+
+        return formatted_cookies
+
             
 class MARGINS(ctypes.Structure):
     _fields_ = [("cxLeftWidth", ctypes.c_int),
