@@ -327,6 +327,8 @@ class AddLink(QWidget):
                         pursed_url = urlparse(link)
                         file_path = pursed_url.path
                         is_m3u8 = 'application/x-mpegURL' in response.headers.get('Content-Type', '').lower() or file_path.lower().endswith('.m3u8')
+
+                        
                         
                         if is_m3u8:
                             url_parsed = urlparse(link)
@@ -343,6 +345,16 @@ class AddLink(QWidget):
                                         if not playlist.is_variant:
                                             segments_urls = [urljoin(base_url, segment.uri) for segment in playlist.segments]
                                             segments_urls = list(dict.fromkeys(segments_urls))
+                                            
+                                            # Get content type from first segment
+                                            first_segment_url = segments_urls[0]
+                                            async with session.head(first_segment_url) as seg_response:
+                                                seg_content_type = seg_response.headers.get('Content-Type', '').lower()
+                                                # Update filename with proper extension based on segment content type
+                                                name = os.path.splitext(filename)[0]  # Remove any existing extension
+                                                extension = self.other_methods.content_type_to_extension.get(seg_content_type, '.m3u8')
+                                                filename = name + extension
+                                                self.filename_entry.setText(filename)
                                             
                                             # Concurrent size fetching
                                             async def fetch_segment_size(seg_url):
