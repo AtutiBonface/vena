@@ -3,10 +3,10 @@ from venaUtils import OtherMethods, Colors, Images
 import storage, queue
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,QScrollArea,QLineEdit,
-    QPushButton, QFrame, QStackedWidget,QSystemTrayIcon,QMenu
+    QPushButton, QFrame, QStackedWidget,QSystemTrayIcon,QMenu, QCheckBox
 )
 from venaWorker import Worker, SetAppTray
-from PyQt6.QtGui import QIcon, QAction, QFont,QFontMetrics
+from PyQt6.QtGui import QIcon, QAction, QFont,QFontMetrics,QPixmap
 from PyQt6.QtCore import Qt, QPoint,QSize ,QThread, QEvent
 from addlink import AddLink
 from qasync import asyncSlot
@@ -16,6 +16,7 @@ from settingsPage  import SettingsWindow
 from aboutPage import AboutWindow
 from fileNotFound_plus import DeletionConfirmationWindow, FileNotFoundDialog
 from settings import AppSettings
+from themes import ThemeColors
 
 
 class MainApplication(QMainWindow):
@@ -30,22 +31,54 @@ class MainApplication(QMainWindow):
         self.setup_styles()
         self.create_widgets()
         self.setup_layout()
-        self.other_methods.set_rounded_corners(self)
         self.start_background_tasks()
-        self.switch_filelist_page(1)
+        self.theme_manager = ThemeColors()
+        self.current_theme = storage.get_setting('THEME') or 'system'
+        self.apply_theme()
 
+    def apply_theme(self):
+        stylesheet = self.theme_manager.get_stylesheet(self.current_theme)
+        self.setStyleSheet(stylesheet)
         
-        
-        
+    def switch_theme(self, theme_name):
+        self.current_theme = theme_name
+        storage.insert_setting('THEME', theme_name)
+        self.apply_theme()
+        if hasattr(self, 'show_less_popup'):
+            self.show_less_popup.update_theme(theme_name)
 
     def setup_window(self):
         self.setWindowTitle('VenaApp')
         self.setWindowIcon(QIcon(self.other_methods.resource_path('images/main.ico')))
-        self.setGeometry(100, 100, 800, 540)
+        self.setGeometry(100, 100, 1000, 640)
         self.center_window()
-        self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
-        
-
+        self.setStyleSheet("""
+            QMainWindow {
+                background-color: #f5f6f7;
+            }
+            #content-container {
+                background-color: white;
+                border: 1px solid #e1e4e8;
+                border-radius: 8px;
+                margin: 8px;
+            }
+            QScrollArea {
+                border: none;
+                background: transparent;
+            }
+            QPushButton {
+                padding: 6px 12px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #e1e4e8;
+            }
+            #sidebar {
+                background-color: #f1f2f3;
+                border-right: 1px solid #e1e4e8;
+                padding: 8px;
+            }
+        """)
 
     def setup_styles(self):
         self.xe_images =Images()
@@ -77,24 +110,16 @@ class MainApplication(QMainWindow):
         self.create_sidebar()
         self.create_content_area()
         self.create_file_list()
-        self.create_complete_filelist()
-        self.create_bottom_bar()
         self.create_top_bar()
         self.create_pages()
 
     def create_app_container(self):
-        self.setContentsMargins(0, 0, 0, 0)
         central_widget = QWidget(self)
         central_widget.setObjectName("hero")
-        central_widget.setContentsMargins(0, 0, 0, 0)
-        title_bar = CustomTitleBar(self)
         self.main_layout = QVBoxLayout(central_widget)
-        self.main_layout.setContentsMargins(0, 0, 0, 0)
         self.body_layout = QHBoxLayout()
-        self.main_layout.addWidget(title_bar)
         self.main_layout.addLayout(self.body_layout)        
         self.setCentralWidget(central_widget)
-       
 
     def create_pages(self):
         self.stacked_widget = QStackedWidget()
@@ -107,26 +132,14 @@ class MainApplication(QMainWindow):
         self.stacked_widget.addWidget(self.settings_page)
 
     def setup_layout(self):
-        self.file_list_stacked_widget = QStackedWidget()
-        self.file_list_stacked_widget.addWidget(self.file_list)
-        self.file_list_stacked_widget.addWidget(self.complete_file_list)
-
         self.content_area.content_area.addWidget(self.topbar)
-        self.content_area.content_area.addWidget(self.file_list_stacked_widget)
-        self.content_area.content_area.addWidget(self.bottom_bar)
+        self.content_area.content_area.addWidget(self.file_list)
         self.body_layout.addWidget(self.sidebar)
         self.body_layout.addWidget(self.stacked_widget, 1)
 
     def switch_page(self, index):
         self.stacked_widget.setCurrentIndex(index)
         self.sidebar.update_button_styles(index)
-
-    def switch_filelist_page(self, index):
-        self.file_list_stacked_widget.setCurrentIndex(index)
-        self.topbar.update_button_styles(index)
-
-
-    
     
     def closeEvent(self, event):
         """ Override the close event to hide the window instead of quitting the application """
@@ -171,8 +184,36 @@ class MainApplication(QMainWindow):
         self.worker_thread.started.connect(self.worker.start_working)
         self.worker_thread.start()
 
-
-    
+    def do_action(self, text):
+        """Handle actions for file operations"""
+        if self.details_of_file_clicked:
+            f_name, path = self.details_of_file_clicked
+            path_and_file = os.path.join(path, f_name)
+            
+            if text == 'Open':
+                if not os.path.exists(path_and_file):
+                    self.file_not_found_popup = FileNotFoundDialog(self, f_name)
+                    self.file_not_found_popup.show()
+                else:
+                    system_name = platform.system()
+                    if system_name == 'Windows':
+                        os.startfile(path_and_file)
+                    elif system_name == 'Linux':
+                        subprocess.Popen(["xdg-open", path_and_file])
+                        
+            elif text == 'Delete':
+                self.confirm = DeletionConfirmationWindow(self, f_name, path_and_file)
+                self.confirm.show()
+                    
+            elif text == 'Pause':
+                self.pause_downloading_file(path_and_file)
+                
+            elif text == 'Resume':
+                self.resume_paused_file(path_and_file)
+                
+            elif text == 'Restart':
+                # Add restart functionality here if needed
+                pass
 
     # Sidebar related methods
     def create_sidebar(self):       
@@ -188,12 +229,6 @@ class MainApplication(QMainWindow):
     # File list related methods
     def create_file_list(self):
         self.file_list = ActiveFileList(self)
-
-    def create_complete_filelist(self):
-        self.complete_file_list = CompleteFileList(self)
-        
-    def create_bottom_bar(self):
-        self.bottom_bar = BottomBar(self)
 
     def center_window(self):
         # Get the screen's geometry (size and position)
@@ -245,8 +280,7 @@ class MainApplication(QMainWindow):
                             cookies = file.get('cookies', None)
 
                             if cookies is not None:
-                                cookies = self.other_methods.format_cookies(cookies)
-                            
+                                cookies = self.other_methods.format_cookies(cookies)                           
                             
                             # Create the top window only once
                             self.add_link_top_window = AddLink(app=self,cache=cookies, url=url, filename=filename, task_manager=self.task_manager)                               
@@ -331,7 +365,7 @@ class MainApplication(QMainWindow):
                     speed=speed
                 )
                 self.complete_file_widgets[filename] = new_widget
-                self.complete_file_list.file_layout.addWidget(new_widget)
+                self.file_list.file_layout.addWidget(new_widget)
         else:
             if filename in self.active_file_widgets:
                 if "failed" in status.lower():
@@ -343,8 +377,6 @@ class MainApplication(QMainWindow):
         
 
     def add_new_file_widget(self, filename, status, size, date): 
-        if self.file_list_stacked_widget.currentIndex() == 1:
-            self.switch_filelist_page(0)
         path = self.xengine_downloads[filename]['path']     
         new_widget = FileItemWidget(
                 app = self,
@@ -360,7 +392,29 @@ class MainApplication(QMainWindow):
         self.active_file_widgets[filename] = new_widget       
         self.file_list.file_layout.insertWidget(0, new_widget)
        
-    
+    def toggle_file_details(self, filename,file_path):       
+       
+         
+        modification_date = self.xengine_downloads[filename]['modification_date']
+        file_size =  self.xengine_downloads[filename]['filesize']
+        address =  self.xengine_downloads[filename]['url']
+        filestatus =  self.xengine_downloads[filename]['status']
+
+        file_size = self.other_methods.return_filesize_in_correct_units(file_size)
+
+        thumbnail = self.other_methods.return_thumbnail(filename, file_path, filestatus)     
+
+   
+
+        self.content_area.edit_fileinfo(thumbnail, filename, file_path, modification_date, file_size, address, filestatus )
+
+    def update_file_details(self, filename, status, downloaded,size,speed):
+        path = self.xengine_downloads[filename]['path']
+        thumbnail = self.other_methods.return_thumbnail(filename, path, status)
+        self.content_area.update_fileinfo(thumbnail, filename, status, size)
+
+
+       
     # File operations
     def pause_downloading_file(self, filename_with_path):
         f_name = os.path.basename(filename_with_path)
@@ -396,24 +450,29 @@ class MainApplication(QMainWindow):
                 
                 asyncio.run_coroutine_threadsafe(self.task_manager.resume_downloads_fn(filename_with_path,  details['url'], self.downloaded_chuck, cookies)  ,self.loop)
         
-    def update_filename(self, old_name, new_name):     
+    def update_filename(self, old_name, new_name):
+        """Update filename in UI and data structures"""     
         pathless_old_name = os.path.basename(old_name)
         pathless_new_name = os.path.basename(new_name)
 
+        # First update the downloads dictionary
         if pathless_old_name in self.xengine_downloads:
             value = self.xengine_downloads.pop(pathless_old_name)
-
             self.xengine_downloads[pathless_new_name] = value
                       
+        # Then update active widgets dictionary and UI
         if pathless_old_name in self.active_file_widgets:
             value = self.active_file_widgets.pop(pathless_old_name) 
-
             self.active_file_widgets[pathless_new_name] = value
-
             file_widget = self.active_file_widgets[pathless_new_name]
-
-            if file_widget.isVisible():
-                file_widget.update_filename(new_name)
+            file_widget.update_filename(pathless_new_name)
+        
+        # Also check completed widgets
+        elif pathless_old_name in self.complete_file_widgets:
+            value = self.complete_file_widgets.pop(pathless_old_name)
+            self.complete_file_widgets[pathless_new_name] = value
+            file_widget = self.complete_file_widgets[pathless_new_name]
+            file_widget.update_filename(pathless_new_name)
 
     def return_all_downloads(self):
         return self.xengine_downloads
@@ -435,7 +494,7 @@ class MainApplication(QMainWindow):
             widget.setParent(None)
         elif filename in  self.complete_file_widgets: 
              widget = self.complete_file_widgets[filename] 
-             self.complete_file_list.file_layout.removeWidget(widget)
+             self.file_list.file_layout.removeWidget(widget)
              widget.setParent(None)
         
         
@@ -445,10 +504,8 @@ class MainApplication(QMainWindow):
        
 
     def clear_displayed_files_widgets(self):
-        if self.file_list_stacked_widget.currentIndex() == 0:
-            self.switch_filelist_page(1)
         for filename,widget in self.complete_file_widgets.items():
-            self.complete_file_list.file_layout.removeWidget(widget)
+            self.file_list.file_layout.removeWidget(widget)
             widget.setParent(None)
 
 
@@ -459,8 +516,6 @@ class MainApplication(QMainWindow):
 
     def clear_failed_files_plus_their_widgets(self):       
         failed_files = []
-        if self.file_list_stacked_widget.currentIndex() == 1:
-            self.switch_filelist_page(0)
         for filename , details in self.xengine_downloads.items():
             if 'failed' in details['status'].lower():
                 failed_files.append(filename)
@@ -482,157 +537,115 @@ class TopBar(QFrame):
         self.app = app  
         self.task_manager = app.task_manager 
         self.other_methods = OtherMethods()  
-        self.buttons = []
         self.create_widgets()
-        self.setStyleSheet("""
-            #active-btn, #downloaded-btn{
-                background-color: #e2e7eb;
-                width: 110px;
-                height: 30px;
-                border-radius: 5px;
-                margin: 5px 5px 0  0;
-            }
-           
-
-        """)
+        self.setObjectName('topbar')
         
     def create_widgets(self):
-        self.setObjectName('topbar')
         main_layout = QVBoxLayout()
         main_layout.setContentsMargins(0, 0, 0, 0)
-        separator = QFrame()
-        separator.setFrameShape(QFrame.Shape.HLine)        
-        separator.setStyleSheet("color : #e2e7eb;")  # Set to black
-        separator.setLineWidth(1)  #
-        navigation_layout = QHBoxLayout() 
-        open_linkbox_btn = QPushButton(QIcon(self.other_methods.resource_path('images/link-outline.png')), "") 
-        open_linkbox_btn.setObjectName('open_linkbox_btn') 
-        open_linkbox_btn.clicked.connect(self.open_link_box)
         
-        main_layout.addLayout(navigation_layout)
+        actions_layout = QHBoxLayout()
+        actions_layout.setContentsMargins(8, 0, 8, 0)
+
+        # Add link button with spacing
+        add_link_btn = QPushButton(QIcon(self.other_methods.resource_path('images/link-outline.png')), "Add Link")
+        add_link_btn.setObjectName('add-link-btn')
+        add_link_btn.setIconSize(QSize(14, 14))
+        add_link_btn.clicked.connect(self.open_link_box)
+        add_link_btn.setFixedHeight(35)
+        
+        # Action buttons with proper spacing
+        open_btn = QPushButton(QIcon(self.other_methods.resource_path('images/open-filled.png')), "Open")
+        delete_btn = QPushButton(QIcon(self.other_methods.resource_path('images/trash-bin-filled.png')), "Delete")
+        pause_btn = QPushButton(QIcon(self.other_methods.resource_path('images/pause-filled.png')), "Pause")
+        resume_btn = QPushButton(QIcon(self.other_methods.resource_path('images/play-button-filled.png')), "Resume")
+        restart_btn = QPushButton(QIcon(self.other_methods.resource_path('images/refresh-filled.png')), "Restart")
+
+        # Set fixed height and style for all buttons
+        for btn in [add_link_btn, open_btn, delete_btn, pause_btn, resume_btn, restart_btn]:
+            btn.setFixedHeight(35)
+            btn.setIconSize(QSize(14, 14))  # Smaller icon size
+            btn.setStyleSheet("""
+                QPushButton {
+                    text-align: center;
+                    padding-left: 8px;
+                }
+                QPushButton QIcon {
+                    margin-right: 4px;
+                }
+            """)
+
+        # Add buttons to layout
+        actions_layout.addWidget(add_link_btn)
+        actions_layout.addStretch()
+        actions_layout.addWidget(open_btn)
+        actions_layout.addWidget(delete_btn)
+        actions_layout.addWidget(pause_btn)
+        actions_layout.addWidget(resume_btn)
+        actions_layout.addWidget(restart_btn)
+
+        # Connect action buttons
+        open_btn.clicked.connect(lambda: self.app.do_action('Open'))
+        delete_btn.clicked.connect(lambda: self.app.do_action('Delete'))
+        pause_btn.clicked.connect(lambda: self.app.do_action('Pause'))
+        resume_btn.clicked.connect(lambda: self.app.do_action('Resume'))
+        restart_btn.clicked.connect(lambda: self.app.do_action('Restart'))
+
+        main_layout.addLayout(actions_layout)
         self.setLayout(main_layout)
-        navigation_layout.addWidget(open_linkbox_btn)
-        navigation_layout.addStretch()
-        self.add_icon_button(navigation_layout, {"outline": "images/active.png", "filled": "images/inactive.png"}, "Active", 0)
-        self.add_icon_button(navigation_layout, {"outline": "images/complete-active.png", "filled": "images/complete.png"}, "Downloaded", 1)
-        navigation_layout.setContentsMargins(0, 0, 0, 0)
-        navigation_layout.setAlignment(Qt.AlignmentFlag.AlignRight)
-        main_layout.addWidget(separator)  
-        self.update_button_styles(0)
 
     def open_link_box(self):       
         self.app.add_link_top_window = AddLink(app=self.app, task_manager=self.task_manager)
-        self.app.add_link_top_window.show() 
-
-    def add_icon_button(self, layout, icon_paths, text, index):
-        btn = QPushButton(QIcon(self.other_methods.resource_path(icon_paths['outline'])), f" {text}")
-        btn.setObjectName(f'{text.lower()}-btn')
-        btn.setIconSize(QSize(12, 12))
-        btn.clicked.connect(lambda: self.app.switch_filelist_page(index))
-        layout.addWidget(btn)
-        self.buttons.append((btn, icon_paths))
-        return btn  
-
-    def update_button_styles(self, active_index):
-        for i, (btn, icon_paths) in enumerate(self.buttons):
-            if i == active_index:
-                btn.setIcon(QIcon(self.other_methods.resource_path(icon_paths['outline'])))
-                btn.setStyleSheet("""
-                    QPushButton {
-                       background-color: #48D1CC;
-                    }
-                """)
-            else:
-                btn.setIcon(QIcon(self.other_methods.resource_path(icon_paths['filled'])))
-                btn.setStyleSheet("""
-                    QPushButton {
-                        background-color: #e2e7eb;
-                    }
-                    
-                """)
-
-class BottomBar(QFrame):
-    def __init__(self, app):
-        super().__init__()
-        self.other_methods = OtherMethods() 
-        self.app = app
-        self.setObjectName('bottombar')
-        #app.previously_clicked_btn = None
-        #app.details_of_file_clicked = None
-        main_layout = QVBoxLayout()
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        separator = QFrame()
-        separator.setFrameShape(QFrame.Shape.HLine)        
-        separator.setStyleSheet("color : #e2e7eb;")  # Set to black
-        separator.setLineWidth(1)  #
-        main_layout.addWidget(separator)       
-        navigation_layout2 = QHBoxLayout()
-        navigation_layout2.setContentsMargins(0, 0, 0, 0)
-        main_layout.addLayout(navigation_layout2)
-        self.setLayout(main_layout)
-        self.add_icon_button_to_actions_bar(navigation_layout2, "images/open-outline.png", "Open")
-        self.add_icon_button_to_actions_bar(navigation_layout2, "images/trash-bin-outline.png", "Delete")
-        self.add_icon_button_to_actions_bar(navigation_layout2, "images/pause-outline.png", "Pause")
-        self.add_icon_button_to_actions_bar(navigation_layout2, "images/play-button-outline.png", "Resume")
-        self.add_icon_button_to_actions_bar(navigation_layout2, "images/refresh-outline.png", "Restart")
-
-    def add_icon_button_to_actions_bar(self, layout, icon_path, text):
-        btn = QPushButton(QIcon(self.other_methods.resource_path(icon_path)), "")
-        btn.setObjectName(f'{text}-btn')
-        btn.clicked.connect(lambda : self.do_action(text))
-        layout.addWidget(btn)
-        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-
-    def do_action(self, text):
-        if self.app.details_of_file_clicked:
-            f_name , path = self.app.details_of_file_clicked 
-            path_and_file = os.path.join(path, f_name)
-            if text.strip() == 'Open':
-                if not os.path.exists(path_and_file):
-                    self.file_not_found_popup = FileNotFoundDialog(self.app, f_name)
-                    self.file_not_found_popup.show()
-                        
-                else:
-                    system_name = platform.system()   
-                
-                    if system_name == 'Windows':
-                        os.startfile(path_and_file)
-
-                    elif system_name == 'Linux':
-                        subprocess.Popen(["xdg-open", path_and_file])
-                pass ## open file
-            elif text.strip() == 'Delete':              
-
-                file_to_delete = os.path.join(path, f_name)
-                self.confirm = DeletionConfirmationWindow(self.app, f_name, file_to_delete)
-                self.confirm.show()
-                    
-            elif text.strip() == 'Pause':
-                self.app.pause_downloading_file(path_and_file)
-                pass ## pause downloading
-            elif text.strip() == 'Resume':
-                self.app.resume_paused_file(path_and_file)
-            elif text.strip() == 'Restart':
-                pass ### restart donwload
-            
-       
-
-
+        self.app.add_link_top_window.show()
 
 class ContentArea(QFrame):
     def __init__(self):
         super().__init__()
+        self.create_widgets()
+        self.setObjectName("content-container")
+        # Remove individual styling as it's handled by theme system
         
-        self.create_widgets()        
-    
     def create_widgets(self):
+        self.both_sides = QHBoxLayout()
+        self.both_sides.setContentsMargins(0, 0, 0, 0)   
         self.content_area = QVBoxLayout()
         self.content_area.setContentsMargins(0, 0, 0, 0)    
-        self.setObjectName("content-container")
-        self.setLayout(self.content_area)
+        self.details_area = QVBoxLayout()
+        self.details_area.setContentsMargins(0, 0, 0, 0)   
+        self.both_sides.addLayout(self.content_area)
+
+        self.file_info = FileInfoBox()
+        self.details_area.addWidget(self.file_info)    
         
-    
+       
+        self.both_sides.addLayout(self.details_area)
+        self.setLayout(self.both_sides)
+        self.details_opened = False
+
+       
+
+    def edit_fileinfo(self, thumbnail, filename, filepath, fileadded_at, filesize, fileaddress, filestatus):
+        self.details_opened = True
+        self.pixmap = QPixmap(f"{thumbnail}")  # Adjust image path
+        self.pixmap = self.pixmap.scaledToWidth(100)        
+        self.file_info.image_label.setPixmap(self.pixmap)
+
+        self.file_info.file_name_label.setText(f"{filename}")
+        self.file_info.added_at_label.setText(f"Added at: {fileadded_at}")
+        self.file_info.path_label.setText(f"Path: {filepath}")
+        self.file_info.link_label.setText(f'Address: <a href="{fileaddress}">{fileaddress}</a>')
+        self.file_info.status_label.setText(f"Status: {filestatus}")
+        self.file_info.size_label.setText(f"Total size: {filesize}")
+
+    def update_fileinfo(self, thumbnail, filename, filestatus, filesize):
+        if self.details_opened:
+            self.pixmap = QPixmap(f"{thumbnail}")  # Adjust image path
+            self.pixmap = self.pixmap.scaledToWidth(100)        
+            self.file_info.image_label.setPixmap(self.pixmap)
+            self.file_info.file_name_label.setText(f"{filename}")
+            self.file_info.status_label.setText(f"Status: {filestatus}")
+            self.file_info.size_label.setText(f"Total size: {filesize}")
+        
 
 class Sidebar(QFrame):
     def __init__(self, app):
@@ -640,20 +653,14 @@ class Sidebar(QFrame):
         self.main_app = app
         self.buttons = []
         self.other_methods = OtherMethods()
+        self.network_status = QLabel()
+        self.network_status.setObjectName('network-status')
+        self.network_status.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.network_status.setFixedSize(40, 40)  # Match sidebar button size
+        self.network_status.hide()  # Hidden by default
+        self.check_network_status()
         self.create_widgets()
-
-        self.setStyleSheet("""
-            #sidebar {
-                background-color: #e2e7eb;
-            }
-            QPushButton {
-                border-radius: 10px;
-                margin: 0;
-                width: 40px;
-                height: 40px;
-                margin-bottom: 10px;
-            }
-        """)
+        self.setObjectName('sidebar')
 
     def add_icon_button(self, layout, icon_paths, text, index):
         btn = QPushButton(QIcon(self.other_methods.resource_path(icon_paths['outline'])), "")
@@ -666,50 +673,65 @@ class Sidebar(QFrame):
 
     def create_widgets(self):       
         sidebar = QVBoxLayout()
-        sidebar.setSpacing(0)
-        sidebar.setContentsMargins(5, 5, 5, 5)
-        self.add_icon_button(sidebar, {"outline": "images/home-outline.png", "filled": "images/home-filled.png"}, "Home", 0)
-        self.add_icon_button(sidebar, {"outline": "images/about-outline.png", "filled": "images/about-filled.png"}, "About", 1)
-        self.add_icon_button(sidebar, {"outline": "images/settings-outline.png", "filled": "images/settings-filled.png"}, "Settings", 2)
+        sidebar.setSpacing(4)  # Reduce spacing between buttons
+        sidebar.setContentsMargins(0, 0, 0 ,0)  # Minimal margins
+        
+        # Add buttons at the top
+        buttons_container = QVBoxLayout()
+        buttons_container.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self.add_icon_button(buttons_container, {"outline": "images/home-filled.png", "filled": "images/home-outline.png"}, "Home", 0)
+        self.add_icon_button(buttons_container, {"outline": "images/about-filled.png", "filled": "images/about-outline.png"}, "About", 1)
+        self.add_icon_button(buttons_container, {"outline": "images/settings-filled.png", "filled": "images/settings-outline.png"}, "Settings", 2)
+        
+        # Add buttons container to main sidebar
+        sidebar.addLayout(buttons_container)
+        
+        # Add stretch to push network status to bottom
+        sidebar.addStretch()
+        
+        # Add network status at bottom
+        sidebar.addWidget(self.network_status)
+        
         self.setLayout(sidebar)
-        self.setObjectName('sidebar')
-        self.setFixedWidth(50)
         self.update_button_styles(0)  # Set initial active button
 
     def update_button_styles(self, active_index):
         for i, (btn, icon_paths) in enumerate(self.buttons):
             if i == active_index:
                 btn.setIcon(QIcon(self.other_methods.resource_path(icon_paths['filled'])))
-                btn.setStyleSheet("""
-                    QPushButton {
-                        background-color: white;
-                    }
-                """)
+                btn.setProperty('active', True)
             else:
                 btn.setIcon(QIcon(self.other_methods.resource_path(icon_paths['outline'])))
-                btn.setStyleSheet(f"""
-                    QPushButton {{
-                        background-color: #e2e7eb;
-                    }}
-                    QPushButton:hover {{
-                        background-color: white;
-                    }}
-                    QPushButton:hover {{
-                        icon: url('{icon_paths['filled']}');
-                    }}
-                """)
+                btn.setProperty('active', False)
+            btn.style().unpolish(btn)
+            btn.style().polish(btn)
+
+    def check_network_status(self):
+        try:
+            import socket
+            socket.create_connection(("8.8.8.8", 53), timeout=1)
+            self.network_status.hide()
+        except OSError:
+            # Set pixmap with specific size to match button icons
+            pixmap = QIcon(self.other_methods.resource_path('images/no-connection.png')).pixmap(24, 24)
+            self.network_status.setPixmap(pixmap)
+            self.network_status.show()
         
 class ActiveFileList(QScrollArea):
     def __init__(self, app):
         super().__init__()       
         self.setObjectName('scroll-area')
         self.app = app
-        # Create a widget to contain the layout
+        
         self.scroll_widget = QFrame()
-        self.scroll_widget.setStyleSheet('background-color: transparent;')
+        self.scroll_widget.setObjectName('scroll-widget')
         self.file_layout = QVBoxLayout(self.scroll_widget)
-        self.file_layout.setAlignment(Qt.AlignmentFlag.AlignTop)     
+        self.file_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self.file_layout.setContentsMargins(0, 0, 0, 0)
+        self.file_layout.setSpacing(0)
+        
         self.display_incomplete_downloads()
+        self.display_complete_downloads()
 
         self.setWidget(self.scroll_widget)
         self.setWidgetResizable(True)
@@ -725,6 +747,16 @@ class ActiveFileList(QScrollArea):
         )
         for filename, detail in self.sorted_downloads:
             if 'finished' not in detail['status'].lower():
+                self.add_file_widget(filename, detail)
+
+    def display_complete_downloads(self):
+        self.sorted_downloads = sorted(
+            self.app.return_all_downloads().items(),
+            key=lambda x: x[1]['modification_date'],
+            reverse=True
+        )
+        for filename, detail in self.sorted_downloads:
+            if 'finished' in detail['status'].lower():
                 self.add_file_widget(filename, detail)
 
     def add_file_widget(self, filename, detail):
@@ -743,306 +775,153 @@ class ActiveFileList(QScrollArea):
             self.app.active_file_widgets[filename] = file_item          
             self.file_layout.insertWidget(0, file_item)
 
-class CompleteFileList(QScrollArea):
-    def __init__(self, app):
-        super().__init__()       
-        self.setObjectName('scroll-area')
-        self.app = app
-
-        self.scroll_widget = QFrame()
-        self.scroll_widget.setStyleSheet('background-color: transparent;')
-        self.file_layout = QVBoxLayout(self.scroll_widget)
-        self.file_layout.setAlignment(Qt.AlignmentFlag.AlignTop)     
-        self.display_complete_downloads()
-        self.setWidget(self.scroll_widget)
-        self.setWidgetResizable(True)
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded) 
-       
-
-
-
-        # Set the scrollable widget
-    def display_complete_downloads(self):
-        self.sorted_downloads = sorted(
-            self.app.return_all_downloads().items(),
-            key=lambda x: x[1]['modification_date'],
-            reverse=True
-        )
-        for filename, detail in self.sorted_downloads:
-            if 'finished' in detail['status'].lower():
-                self.add_file_widget(filename, detail)
-
-    def add_file_widget(self, filename, detail):
-        if filename not in self.app.complete_file_widgets:
-            file_item = FileItemWidget(
-                app=self.app,
-                filename=filename,
-                path=detail['path'],
-                file_size=detail['filesize'],
-                downloaded=detail['downloaded'],
-                modified_date=detail['modification_date'],
-                status=detail['status'],
-                percentage=detail['percentage'],
-                speed=" "
-            )
-            self.app.complete_file_widgets[filename] = file_item
-            self.file_layout.insertWidget(0, file_item)
-
 
 class FileItemWidget(QFrame):
-    def __init__(self,app, filename,path, file_size, downloaded,status, percentage, speed,modified_date):
+    def __init__(self, app, filename, path, file_size, downloaded, status, percentage, speed, modified_date):
         super().__init__()
         self.app = app
         if 'downloading' in status.lower().strip() or 'resuming' in status.lower().strip():
             status = 'Paused.'
 
-
-
         self.is_selected = False
         self.file_path = path
-        self.filename  = filename
-        self.other_methods = OtherMethods()       
+        self.filename = filename
+        self.other_methods = OtherMethods()
         file_size = self.other_methods.return_filesize_in_correct_units(file_size)
         downloaded = self.other_methods.return_filesize_in_correct_units(downloaded)
         self.image = self.other_methods.return_file_type(filename)
-        self.setFixedHeight(60)
-        # Create a horizontal layout to hold the icon and the text information
-        main_layout = QHBoxLayout(self)
-        main_layout.setSpacing(0)
-        main_layout.setContentsMargins(5, 0, 5, 0)
 
+        # Create main layout
+        main_layout = QHBoxLayout(self)
+        main_layout.setSpacing(12)
+        main_layout.setContentsMargins(12, 8, 12, 8)
+
+        # Left section - Checkbox and icon
+        left_section = QHBoxLayout()
+        left_section.setSpacing(10)  # Adjust spacing between checkbox and icon
+        
+        self.checkbox = QCheckBox()
+        self.checkbox.setFixedSize(18, 18)  # Keep the size but remove custom styling
+        
         self.icon_label = QLabel()
         self.icon_label.setObjectName('icon-label')
+        self.icon_label.setFixedSize(32, 32)
+        self.icon_label.setPixmap(QIcon(self.other_methods.resource_path(self.image)).pixmap(20, 20))
         self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.icon_label.setPixmap(QIcon(self.other_methods.resource_path(self.image)).pixmap(20, 20))
-
-        main_layout.addWidget(self.icon_label)        
-
-        text_layout = QVBoxLayout()
-        text_layout.setContentsMargins(0, 0, 0, 0)
         
-        # Filename (top row)
-        #self.filename_label = QLabel(filename)
-        self.filename_label = QLabel(self.get_elided_text(filename, 600))
-        self.filename_label.setWordWrap(False)  # Ensure text does not wrap
+        left_section.addWidget(self.checkbox)
+        left_section.addWidget(self.icon_label)
+        main_layout.addLayout(left_section)
 
-        text_layout.addWidget(self.filename_label)
-        text_layout.setObjectName("filename")
-
-        self.details_layout = QHBoxLayout()
-        self.download_status = QLabel(f"{status}")
+        # Center section - File info
+        info_section = QVBoxLayout()
+        info_section.setSpacing(4)
         
-        if not '---' in percentage and 'paused' in status.lower().strip():
-            self.download_status.setText(f'{status} {percentage}')
-        self.download_status.setObjectName('status')
-        self.download_info = QLabel(f"[ {downloaded} / {file_size} ]")
-        self.download_info.setObjectName("info")
-        self.download_speed = QLabel('')
-        self.download_speed.setObjectName('speed')
-        self.download_failed = QPushButton('retry')
-        self.download_failed.setObjectName('retry')
+        # Filename row
+        self.filename_label = QLabel()
+        self.filename_label.setObjectName('filename-label')
+        metrics = QFontMetrics(self.filename_label.font())
+        elided_filename = metrics.elidedText(filename, Qt.TextElideMode.ElideMiddle, 380)
+        self.filename_label.setText(elided_filename)
+        self.filename_label.setToolTip(filename)  # Show full name on hover
+        info_section.addWidget(self.filename_label)
+
+        # Status row
+        status_layout = QHBoxLayout()
+        status_layout.setSpacing(12)
+        
+        # Progress info
+        progress_text = f"{downloaded} of {file_size}"
+        if '---' in downloaded or '---' in file_size:
+            progress_text = "Waiting..."
+        
+        self.download_info = QLabel(progress_text)
+        self.download_info.setObjectName('info-label')
+        
+        # Status label with progress
+        status_text = status
+        status_type = 'downloading'  # default status
+        if 'failed' in status.lower():
+            status_text = "Failed"
+            status_type = 'failed'
+        elif 'finished' in status.lower() or 'completed' in status.lower():
+            status_text = "Completed"
+            status_type = 'completed'
+        elif 'paused' in status.lower():
+            status_text = "Paused"
+            status_type = 'paused'
+        
+        self.download_status = QLabel(status_text)
+        self.download_status.setObjectName('status-label')
+        self.download_status.setProperty('download-status', status_type)  # Changed property name
+        self.download_status.style().polish(self.download_status)
+        
+        # Speed label
+        self.download_speed = QLabel(speed if speed and speed.strip() not in ['0', '', '---'] else '')
+        self.download_speed.setObjectName('speed-label')
+        
+        status_layout.addWidget(self.download_info)
+        status_layout.addWidget(self.download_status)
+        status_layout.addWidget(self.download_speed)
         
         if 'failed' in status.lower():
-            self.download_status.setText("Failed!")
-        self.details_layout.addWidget(self.download_status)
-        self.details_layout.addWidget(self.download_info)
-        self.details_layout.addWidget(self.download_speed) 
-           
+            self.download_failed = QPushButton('Retry')
+            self.download_failed.setObjectName('retry-btn')
+            self.download_failed.clicked.connect(self.retry_downloading)
+            status_layout.addWidget(self.download_failed)
+        
+        status_layout.addStretch()
+        info_section.addLayout(status_layout)
+        
+        main_layout.addLayout(info_section, 1)
 
-        if 'failed' in status.lower():
-            self.details_layout.addWidget(self.download_failed) 
-            self.download_failed.clicked.connect(self.retry_downloading)  
-            
-             
+        # Right section - Date
         self.modified_label = QLabel(modified_date)
-        self.modified_label.setObjectName('modified_date')
-        self.modified_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        self.details_layout.addWidget(self.modified_label)
+        self.modified_label.setObjectName('date-label')
+        main_layout.addWidget(self.modified_label)
 
-        text_layout.addLayout(self.details_layout)
-        
-        main_layout.addLayout(text_layout)
-
-        self.apply_font(self.filename_label, 'Lato', 10)
-        self.apply_font(self.download_status, 'Arial', 10)
-        self.apply_font(self.download_info, 'Arial', 9)
-        self.apply_font(self.download_speed, 'Exo 2', 10)
-        self.apply_font(self.download_failed, 'Arial', 9, underline=True, italic=True)
-        
         self.setLayout(main_layout)
+        self.apply_fonts()
+        self.setup_styles()
 
-        self.setStyleSheet("""
-            FileItemWidget {
-                background-color: transparent;
-                border-radius: 5px;
-                height: 60px;
-                margin: 0;
-            }
-            #icon-label {
-                max-width: 40px;
-            }
-            #filename{
-                background-color: transparent;
-            }
-            #status{               
-                max-width: 150px;
-                color: grey;
-            }
-            #info{                
-                max-width: 150px;
-                color: grey;
-            }
-            #speed{               
-                max-width: 70px;
-                color: grey;
-            }
-            #retry{
-                max-width: 60px;
-                color: orange;                           
-            }
-            #retry:hover{
-                color: #48D1CC; 
-            }
+        # Update status label with proper status and color
+        status_type = 'downloading'
+        if 'finished' in status.lower():
+            status_type = 'completed'
+        elif 'failed' in status.lower():
+            status_type = 'failed'
+        elif 'paused' in status.lower():
+            status_type = 'paused'
             
-        """)
-         
+        self.download_status.setProperty('download-status', status_type)
+        self.download_status.style().unpolish(self.download_status)
+        self.download_status.style().polish(self.download_status)
 
+    def setup_styles(self):
+        # Remove hardcoded styles since they're now handled by theme system
+        pass
 
+    def apply_fonts(self):
+        self.apply_font(self.filename_label, 'Segoe UI', 13)
+        self.apply_font(self.download_status, 'Segoe UI', 12)
+        self.apply_font(self.download_info, 'Segoe UI', 12)
+        self.apply_font(self.download_speed, 'Segoe UI', 12)
+        self.apply_font(self.modified_label, 'Segoe UI', 12)
 
-    def enterEvent(self, event):
-        """Triggered when mouse enters the widget."""
-        if not self.is_selected:
-            self.setStyleSheet(self.get_hover_style())
-        super().enterEvent(event)
-    def leaveEvent(self, event):
-        """Triggered when mouse leaves the widget."""
-        if not self.is_selected:
-            self.setStyleSheet(self.get_normal_style())
-        super().leaveEvent(event)
-
-    def get_elided_text(self, text, max_width):
-        """Returns the elided text if it exceeds the max width."""
-        font_metrics = QFontMetrics(self.font())
-        return font_metrics.elidedText(text, Qt.TextElideMode.ElideRight, max_width)
-    def mousePressEvent(self, event):
-        """Triggered when the widget is clicked."""
-        if self.app.previously_clicked_btn:
-            self.app.previously_clicked_btn.is_selected = False
-            self.app.previously_clicked_btn.setStyleSheet(self.get_normal_style())
-        
-        self.is_selected = True
-        self.setStyleSheet(self.get_selected_style())
-        self.app.previously_clicked_btn = self
-        self.app.details_of_file_clicked = (
-            self.filename,
-            self.file_path,
-            # Add other details as needed
-        )
-        super().mousePressEvent(event)
-    def get_normal_style(self):
-        return """
-            FileItemWidget {
-                background-color: transparent;
-                border-radius: 5px;
-            }
-            #icon-label {
-                max-width: 40px;
-            }
-            #status {
-                color: grey;
-                max-width: 150px;
-            }
-            #info {
-                color: grey;
-                max-width: 150px;
-            }
-            #speed {
-                color: grey;
-                max-width: 70px;
-            }
-            #retry {
-                max-width: 60px;
-                color: orange;
-            }
-            #retry:hover {
-                color: #48D1CC;
-            }
-        """
-
-    def get_hover_style(self):
-        return """
-            FileItemWidget {
-                background-color: #e0e0e0;
-                border-radius: 5px;
-            }
-            #icon-label {
-                max-width: 40px;
-            }
-            #status {
-                color: grey;
-                max-width: 150px;
-            }
-            #info {
-                color: grey;
-                max-width: 150px;
-            }
-            #speed {
-                color: grey;
-                max-width: 70px;
-            }
-            #retry {
-                max-width: 60px;
-                color: orange;
-            }
-            #retry:hover {
-                color: #48D1CC;
-            }
-        """
-
-    def get_selected_style(self):
-        return """
-            FileItemWidget {
-                background-color: #e2e7eb;
-                border-radius: 5px;
-            }
-            #icon-label {
-                max-width: 40px;
-            }
-            #status {
-                color: grey;
-                max-width: 150px;
-            }
-            #info {
-                color: grey;
-                max-width: 150px;
-            }
-            #speed {
-                color: grey;
-                max-width: 70px;
-            }
-            #retry {
-                max-width: 60px;
-                color: orange;
-            }
-            #retry:hover {
-                color: #48D1CC;
-            }
-        """
-    
-    def update_filename(self, new_name):
-        new_name = os.path.basename(new_name)
-        self.filename_label.setText(self.get_elided_text(new_name, 150))
-        self.image = self.other_methods.return_file_type(new_name)
-        self.icon_label.setPixmap(QIcon(self.other_methods.resource_path(self.image)).pixmap(20, 20))
-
-    def apply_font(self, widget, family,size, italic = False, bold=False, underline=False):
+    def apply_font(self, widget, family, size, italic=False, bold=False, underline=False):
         font = QFont(family, size)
         font.setBold(bold)
         font.setUnderline(underline)
         font.setItalic(italic)
         widget.setFont(font)
 
-    def update_widget(self, filename, status ,size, downloaded, modified_date, speed, percentage):
+    def update_widget(self, filename, status, size, downloaded, modified_date, speed, percentage):
+        # Update filename with ellipsis in middle
+        metrics = QFontMetrics(self.filename_label.font())
+        elided_filename = metrics.elidedText(filename, Qt.TextElideMode.ElideMiddle, 380)
+        self.filename_label.setText(elided_filename)
+        self.filename_label.setToolTip(filename)  # Update tooltip
+
         # Convert file size and downloaded size to correct units
         other_methods = OtherMethods()
         file_size = other_methods.return_filesize_in_correct_units(size)
@@ -1053,273 +932,120 @@ class FileItemWidget(QFrame):
         # Update download status
         if 'finished' in status.lower():
             self.download_status.setText(f"{status} ")
-            if self.download_failed.isVisible():
-                self.details_layout.removeWidget(self.download_failed)   
+            if hasattr(self, 'download_failed') and self.download_failed.isVisible():
                 self.download_failed.setParent(None)
             self.download_speed.setText(f"")
         elif 'failed' in status.lower():           
             self.download_status.setText(f"Failed!") 
-            self.details_layout.removeWidget(self.modified_label)                       
-            self.details_layout.addWidget(self.download_failed) 
-            self.details_layout.addWidget(self.modified_label)
-            self.download_failed.clicked.connect(self.retry_downloading)
+            if hasattr(self, 'download_failed'):
+                self.download_failed.setParent(None)
+                self.download_failed = QPushButton('Retry')
+                self.download_failed.setObjectName('retry-btn')
+                self.download_failed.clicked.connect(self.retry_downloading)
+                self.layout().addWidget(self.download_failed)
             self.download_speed.setText(f"")
         else:
             if not '---' in percentage:
                 self.download_status.setText(f"{status} {percentage}")
             else:
                 self.download_status.setText(f"{status}")
-            if self.download_failed.isVisible():
-                self.details_layout.removeWidget(self.download_failed) 
         # Update download speed
-        if  speed.strip() == '0' or  speed.strip() == '' or  speed.strip() == '---':
+        if speed.strip() == '0' or speed.strip() == '' or speed.strip() == '---':
             self.download_speed.setText(f"")
         else:
             self.download_speed.setText(f"{speed}")
         # Update modified date
-        
-
         self.modified_label.setText(modified_date)
 
+        # Update status type and styling
+        status_type = 'downloading'  # default status
+        if 'finished' in status.lower() or 'completed' in status.lower():
+            status_type = 'completed'
+        elif 'failed' in status.lower():
+            status_type = 'failed'
+        elif 'paused' in status.lower():
+            status_type = 'paused'
+
+        self.download_status.setProperty('download-status', status_type)  # Changed property name
+        self.download_status.style().unpolish(self.download_status)
+        self.download_status.style().polish(self.download_status)
+
+        # Add checkmark image in white
+        if hasattr(self, 'checkbox'):
+            self.checkbox.style().unpolish(self.checkbox)
+            self.checkbox.style().polish(self.checkbox)
+
     def retry_downloading(self):        
-        filename_with_path = os.path.join(self.file_path, self.filename )
+        filename_with_path = os.path.join(self.file_path, self.filename)
         self.app.resume_paused_file(filename_with_path)
 
-
-    
-
-class CustomTitleBar(QFrame):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.parent = parent
-        
-        self.setFixedHeight(40)
-        
-        self.other_methods = OtherMethods()
-        # Create the layout for the title bar
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        
-        # Window icon
-        self.window_icon = QLabel()
-        self.window_icon.setPixmap(QIcon(self.other_methods.resource_path('images/main.ico')).pixmap(24, 24))
-        self.window_icon.setStyleSheet("background-color: transparent; margin: 0 15px;")
+    def update_filename(self, new_name):
+        """Update the displayed filename in the widget"""
+        metrics = QFontMetrics(self.filename_label.font())
+        self.filename = new_name
+        elided_filename = metrics.elidedText(new_name, Qt.TextElideMode.ElideMiddle, 380)
+        self.filename_label.setText(elided_filename)
+        self.filename_label.setToolTip(new_name)
 
 
-        layout.addWidget(self.window_icon)
-
-        self.back_btn = QPushButton(QIcon(self.other_methods.resource_path('images/left-chevron-dull.png')), "")
-        self.back_btn.setObjectName("navigation-btn")
-        self.forward_btn = QPushButton(QIcon(self.other_methods.resource_path('images/chevron-right-dull.png')), "")
-        self.forward_btn.setObjectName("navigation-btn")
-
-        layout.addWidget(self.back_btn)
-        layout.addWidget(self.forward_btn)
-
-        search_action = QAction(QIcon(self.other_methods.resource_path('images/search.png')), "", self)
-        text_input = QLineEdit()
-        text_input.addAction(search_action)
-        
-        text_input.setPlaceholderText("Search")
-       
-        layout.addWidget(text_input)
-
-
-        text_input.setStyleSheet("""
-            QLineEdit {
-                border: 1px solid white;
-                border-radius: 5px;
-                background-color: white;
-                color: #2c3e50;
-                height: 25px;
-                width: 400px;    
-                margin-left: 20px;                             
-            }
-            QLineEdit:focus {
-                border-color:  #48D1CC;
-            }
-        """)
-
-        
-        # Window title
-        
-        
-        # Add spacer to push the buttons to the right
-        
-
-        self.more_btn = QPushButton()
-        
-        self.more_btn.setStyleSheet("""
-             QPushButton::menu-indicator {
-                image: none;  /* Hide the dropdown arrow */
-                padding: 0;
-                icon : none;
-                margin: 0;
-                height : 0;
-                width: 0;
-            }
-            QPushButton{
-                background-color: transparent;
-                margin-left: 10px;
-                padding: 0 5px;
-            }
-            QPushButton:hover{
-                icon : url('images/menu-filled.png') 
-                           
-            }
-           
-        """)
-
-        # Create the dropdown menu
-        self.menu = QMenu(self)
-        #self.menu.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
-        
-        # Add menu items with icons
-        add_action = self.menu.addAction(QIcon("images/add-link.png"), "Add Multiple Links")
-        clear_action = self.menu.addAction(QIcon("images/clean.png"), "Clear Finished")
-        delete_action = self.menu.addAction(QIcon("images/remove.png"), "Delete Selected")
-        clear_failed_action = self.menu.addAction(QIcon("images/clean.png"), "Clear Failed!")
-
-        
-
-        add_action.triggered.connect(self.add_links)
-        clear_action.triggered.connect(self.clear_finished)
-        delete_action.triggered.connect(self.delete_selected)
-        clear_failed_action.triggered.connect(self.clear_failed)
-
-
-       
-
-        # Set the menu for the dropdown button
-        self.more_btn.setMenu(self.menu)
-        self.more_btn.setIcon(QIcon(self.other_methods.resource_path('images/menu-outline.png')),)
-        self.more_btn.setIconSize(QSize(13, 13))
-        layout.addWidget(self.more_btn)
-
-        layout.addStretch()
-
-        # Minimize button
-        self.minimize_button = QPushButton(QIcon(self.other_methods.resource_path('images/minus.png')), "")
-        self.minimize_button.setIconSize(QSize(14, 14))
-        self.minimize_button.setObjectName('window-maxi-min')
-        self.minimize_button.setFixedSize(40, 40)
-        self.minimize_button.clicked.connect(self.minimize_window)
-        layout.addWidget(self.minimize_button)
-        
-        # Maximize button
-        self.maximize_button = QPushButton(QIcon(self.other_methods.resource_path('images/maximize.png')), "")
-        self.maximize_button.setIconSize(QSize(13, 13))
-        self.maximize_button.setObjectName('window-maxi-min')
-        self.maximize_button.setFixedSize(40, 40)
-        self.maximize_button.clicked.connect(self.maximize_restore_window)
-        layout.addWidget(self.maximize_button)
-        
-        # Close button
-        self.close_button = QPushButton(QIcon(self.other_methods.resource_path('images/close.png')), "")
-        self.close_button.setIconSize(QSize(11, 11))
-        self.close_button.setObjectName('window-close')
-        self.close_button.setFixedSize(40, 40)
-        self.close_button.clicked.connect(self.close_window)
-        layout.addWidget(self.close_button)        
-        self.is_maximized = False
+class FileInfoBox(QFrame):
+    def __init__(self):
+        super().__init__()
+        self.init_ui()
+        self.setObjectName('file-info-box')
+        # Remove background color from stylesheet since it's handled by theme system
         self.setStyleSheet("""
-            *{
-                background-color: #e2e7eb;                          
+            QLabel {
+                padding: 10px 0;
+                margin: 0;
             }
-            
-            #navigation-btn{
-                background-color: transparent;
-            }
-            #window-maxi-min{
-                background-color: transparent; 
-                border: none;
-                
-            }
-            #window-maxi-min:hover{
-                background-color: #F1F1F1;
-            }
-            #window-close{
-                background-color: transparent; 
-                border: none; 
-                padding-right: 15px; 
-                padding-left: 15px;
-            }
-            #window-close:hover{
-                background-color: red;
-            }
-            
-
-        """)
-        self.menu.setStyleSheet("""
-            QMenu {
-                width: 200px;
-                padding: 5px;
-                height: 180px;
-                border-radius: 5px;
-                background-color: #48D1CC;
-            }
-            QMenu::item {
-                padding: 5px 20px 5px 25px;
-                border-radius: 5px;
-                width: 145px;
-                height: 25px;
-                background-color:  #e6e6e6;
-                margin-bottom: 10px;
-               
-            }
-            QMenu::item:selected {
-                background-color: #e2e7eb;
-            }
-            QMenu::icon {
-                position: absolute;
-                left: 10px;
-                top: 5px;
+            #link {
+                color: #48D1CC;
             }
         """)
-    def minimize_window(self):
-        self.parent.showMinimized()
 
-    def maximize_restore_window(self):
-        if not self.is_maximized:
-            self.parent.showMaximized()
-            self.is_maximized = True
-            self.maximize_button.setIcon(QIcon(self.other_methods.resource_path('images/squares.png')))
-            self.maximize_button.setIconSize(QSize(12, 12))
+    def init_ui(self):
+        self.main_layout = QVBoxLayout()
+        self.main_layout.addStretch()
+        self.image_label = QLabel()
         
-        else:
-            self.parent.showNormal()
-            self.is_maximized = False
-            self.maximize_button.setIcon(QIcon(self.other_methods.resource_path('images/maximize.png')))
-            self.maximize_button.setIconSize(QSize(13, 13))
+        self.main_layout.addWidget(self.image_label)
+        info_layout = QVBoxLayout()        
+        # File name
+        self.file_name_label = QLabel("")
+        info_layout.addWidget(self.file_name_label)        
+        # Status
+        self.status_label = QLabel("")
+        info_layout.addWidget(self.status_label)        
+        # Total size
+        self.size_label = QLabel("")
+        info_layout.addWidget(self.size_label)        
+        # Added at
+        self.added_at_label = QLabel("")
+        info_layout.addWidget(self.added_at_label)        
+        # File path
+        self.path_label = QLabel("")
+        info_layout.addWidget(self.path_label)
+        # Add info layout to the main layout
+        # File link
+        self.link_label = QLabel('')
+        self.link_label.setObjectName('link')
+        self.link_label.setWordWrap(True) 
+        info_layout.addWidget(self.link_label)
 
-    def close_window(self):
-        self.parent.close()
 
-    def mousePressEvent(self, event):
-        """Override to capture the position of the window when the user clicks."""
-        self.old_pos = event.globalPosition().toPoint()
+        
+        self.link_label.setOpenExternalLinks(True)
+        self.main_layout.addLayout(info_layout)
+        self.main_layout.addStretch()
+       
 
-    def mouseMoveEvent(self, event):
-        """Override to move the window when the user drags the title bar."""
-        delta = QPoint(event.globalPosition().toPoint() - self.old_pos)
-        self.parent.move(self.parent.x() + delta.x(), self.parent.y() + delta.y())
-        self.old_pos = event.globalPosition().toPoint()
 
-    def add_links(self):
-        print("Add Links selected")
 
-    def clear_finished(self):
-        self.parent.clear_displayed_files_widgets()
+        # Set main layout
+        self.setLayout(self.main_layout)
+        self.setMinimumWidth(200)
+        self.setMaximumWidth(300)
 
-    def clear_failed(self):
-        self.parent.clear_failed_files_plus_their_widgets() 
-
-    def delete_selected(self):
-       if self.parent.details_of_file_clicked:
-            f_name , path = self.parent.details_of_file_clicked 
-
-            file_to_delete = os.path.join(path, f_name)
-            self.confirm = DeletionConfirmationWindow(self.parent, f_name, file_to_delete)
-            self.confirm.show()
 
 

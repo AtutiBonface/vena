@@ -15,47 +15,7 @@ def switch_filelist_page(self, index):
 class AboutWindow(QFrame):
     def __init__(self):
         super().__init__()
-        self.setStyleSheet("""
-            AboutWindow{
-                background-color: white;
-                border-radius: 10px;
-                border: 1px solid #ccc;
-                padding: 5px;
-                margin: 0px 5px 5px 0;  
-                          
-            }
-            QPushButton {
-                border: none;
-                padding: 0 16px;
-                text-align: center;
-                text-decoration: none;
-                font-size: 13px;
-                margin: 4px 2px;
-                border-radius: 5px;
-                background-color: #48D1CC;
-                height: 40px;
-            }
-           
-            QLineEdit, QComboBox, QSpinBox {
-                padding: 6px;
-                font-size: 14px;
-                border: 1px solid #ddd;
-                border-radius: 4px;
-            }
-            #scroll-area{
-                background-color: transparent;
-                border: none;
-                margin: 5px;
-                border-radius: 10px;
-            }
-            #scroll-content{
-                border-radius: 10px;
-                background-color: transparent; 
-            }
-            #title{
-              
-            }
-        """)
+        self.setObjectName("content-container")
 
         main_layout = QVBoxLayout()
         main_layout.setContentsMargins(0, 0, 0,0)
@@ -153,8 +113,4 @@ class AboutWindow(QFrame):
         scroll_area.setWidget(scroll_content)
         main_layout.addWidget(scroll_area)
 
-        # Close button
-        close_button = QPushButton("Close")
-        close_button.clicked.connect(self.close)
-        main_layout.addWidget(close_button, alignment=Qt.AlignmentFlag.AlignCenter)
         self.setLayout(main_layout)

@@ -196,6 +196,49 @@ class OtherMethods():
             return "image"
         else: return 'document'
 
+    def return_thumbnail_url(self, filename):
+        name , extension = os.path.splitext(filename)
+        extension = extension.lower()
+        if extension in self.video_extensions:
+            return "images/vlc.png"  # Video icon
+        elif extension in self.document_extensions:
+            if extension == '.pdf':
+                return "images/pdf.png"  # PDF icon
+            elif extension in ['.doc', '.docx']:
+                return "images/word.png"  # Word document icon
+            elif extension in ['.xls', '.xlsx']:
+                return "images/excel.png"  # Excel spreadsheet icon
+            elif extension in ['.ppt', '.pptx']:
+                return "images/powerpoint.png"  # PowerPoint presentation icon
+            elif extension == '.csv':
+                return "images/csv.png"  # CSV file icon
+            
+            return "images/document.png"  # General document icon
+        elif extension in self.program_extensions:
+            return "images/iso.png"  # Program icon
+        elif extension in self.audio_extensions:
+            return "images/vlc.png"  # Music icon
+        elif extension in self.compressed_extensions:
+            return "images/windows-zip.png"  # Compressed file icon
+        elif extension in self.image_extensions:
+            return "images/windows-photo.png"  # Image icon
+        else:
+            return "images/default.png"  # Default icon for unknown file types
+
+
+    def return_thumbnail(self, filename, path, status):
+        file_types = self.return_files_by_extension(filename)
+        thumbnail = self.return_thumbnail_url(filename)
+
+        if 'finished' not in status.lower():
+            return thumbnail
+        else:
+            if 'image' in file_types:
+                return f"{Path().joinpath(path, filename)}"
+            else:
+                return thumbnail
+
+
     def add_shadow_effect(self, widget):
         hwnd = widget.winId().__int__()  # Get window handle
         # Create a MARGINS structure with -1 for all sides (this enables shadows)
@@ -328,94 +371,42 @@ class OtherMethods():
         }
     def get_qss(self):
         return """
-            *{
+            * {
                 padding: 0;
                 margin: 0;
-                
-               
-            }  
-            QPushButton{
-                background-color: transparent;
-                border: none;
-            }         
-            #hero{
-                background-color: #e2e7eb;
-                margin: 0;
-                padding : 0;
             }
-        
-            #topbar, #bottombar{
-                height : 40px;
-                background-color: transparent;
-               
+            #hero {
+                background-color: #f5f6f7;
             }
-           
-            
-            #content-container{
+            #topbar {
                 background-color: white;
-                border-radius: 10px;
-                border: 1px solid #ccc;
-                padding: 0;
-                margin: 0px 5px 5px 0;
-                
+                border-bottom: 1px solid #e1e4e8;
+                padding: 8px;
             }
-            
-            #open_linkbox_btn{
-                width: 40px;
-                height: 30px;
-                background-color: #e2e7eb;
-                margin: 5px 0 0 10px;
-                border-radius: 5px;  
+            #content-container {
+                background-color: white;
+                border-radius: 8px;
+                border: 1px solid #e1e4e8;
+                margin: 8px;
             }
-            #open_linkbox_btn:hover{
-                icon: url('images/link-filled.png')
-            }
-            #scroll-area{
+            QPushButton {
+                background-color: #f1f2f3;
                 border: none;
-                background-color: transparent;
+                border-radius: 4px;
+                padding: 6px 12px;
+                margin-right: 8px;
             }
-            #Open-btn, #Delete-btn, #Pause-btn, #Resume-btn, #Restart-btn{
-                background-color: #e2e7eb;
-                border-radius: 10px;
-                margin: 0;
-                width: 30px;
-                height: 30px;
-                margin: 0 0 5px 0;
-                
-            } 
-            #Delete-btn:hover{
-                icon: url('images/trash-bin-filled.png');
+            QPushButton:hover {
+                background-color: #e1e4e8;
             }
-            #Open-btn:hover{
-                icon: url('images/open-filled.png');
-            }#Pause-btn:hover{
-                icon: url('images/pause-filled.png');
-            }#Restart-btn:hover{
-                icon: url('images/refresh-filled.png');
-            }#Resume-btn:hover{
-                icon: url('images/play-button-filled.png');
+            #add-link-btn {
+                background-color: #0366d6;
+                color: white;
             }
-            QScrollBar:vertical {
-                border: none;
-                background: #e2e7eb;
-                width: 18px;
-                margin: 20px 3px 20px 3px;
-                border-radius: 5px;
+            #add-link-btn:hover {
+                background-color: #035fc7;
             }
-            QScrollBar::handle:vertical {
-                background: #48D1CC;
-                min-height: 70px;
-                border-radius: 5px;
-            }
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                background: none;
-            }
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-                background: none;
-            }
-           
-            
-            
+            // ...rest of existing styles...
         """
     
     def format_cookies(self, cookies):
@@ -460,10 +451,10 @@ class MARGINS(ctypes.Structure):
                 ("cxRightWidth", ctypes.c_int),
                 ("cyTopHeight", ctypes.c_int),
                 ("cyBottomHeight", ctypes.c_int)]
-            
 
-                
-            
+
+
+
 
 
 

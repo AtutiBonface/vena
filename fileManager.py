@@ -5,6 +5,7 @@ import aiofiles, storage
 from pathlib import Path
 import shutil, m3u8
 from venaUtils import OtherMethods
+import ffmpeg
 from urllib.parse import urlparse, urlunparse, urljoin
 
 class FileManager:
@@ -49,25 +50,30 @@ class FileManager:
 
     async def combine_segments(self, filename, link, size, num_segments, uuid):      
        
-        tem_folder = f"{Path().home()}/.venaApp/temp/{uuid}"
+
+        output_path = Path(filename).parent
+        original_name = Path(filename).name
+        temp_folder = Path.home() / f".venaApp/temp/{uuid}"
+        temp_combined_file = temp_folder / original_name
 
         try:        
-            async with aiofiles.open(filename, 'wb') as final_file:
+            async with aiofiles.open(filename, 'wb') as comgined_file:
                 for i in range(num_segments):
-                    segment_filename = f'{tem_folder}/part{i}'
+                    segment_filename = f'{temp_folder}/part{i}'
                     async with aiofiles.open(segment_filename, 'rb') as segment_file:
                         while True:
                             chunk = await segment_file.read(self.config.CHUNK_SIZE)
                             if not chunk:
                                 break
-                            await final_file.write(chunk)
-                   
-            shutil.rmtree(tem_folder)
+
+                            await comgined_file.write(chunk)
+                                  
+            shutil.rmtree(temp_folder)
             
             await self.task_manager.progress_manager.update_file_details_on_storage_during_download(
                 filename, link, size, size, 'Finished.', 0,'', time.strftime('%Y-%m-%d %H:%M'))
-        except Exception as e:
-            
+        except Exception as e:   
+            print(e)         
             downloaded = self.task_manager.size_downloaded_dict[filename][0]
             await self.task_manager.progress_manager.update_file_details_on_storage_during_download(
                 filename, link, size, downloaded, 'Failed!', 0,'', time.strftime('%Y-%m-%d %H:%M'))

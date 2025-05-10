@@ -1,70 +1,68 @@
 import sys
-from PyQt6.QtWidgets import QApplication, QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QIcon, QPixmap
+from PyQt6.QtWidgets import (
+    QApplication, QLabel, QVBoxLayout, QHBoxLayout,
+    QWidget, QPushButton, QLineEdit
+)
+from PyQt6.QtGui import QPixmap
 
-class FileNotFoundDialog(QDialog):
-    def __init__(self, file_name):
+
+class FileInfoApp(QWidget):
+    def __init__(self):
         super().__init__()
-        self.file_name = file_name
         self.init_ui()
 
     def init_ui(self):
-        self.setWindowTitle("File Not Found")
-        self.setWindowIcon(QIcon("images/failed.png"))  # Replace with your icon path
-        self.setFixedSize(400, 200)
+        # Set window title
+        self.setWindowTitle("File Info")
 
+        # Main vertical layout
         main_layout = QVBoxLayout()
 
-        # Icon and message layout
-        icon_message_layout = QHBoxLayout()
+        # Add image preview
+        image_label = QLabel()
+        pixmap = QPixmap("free-photo-of-stack-of-delicious-homemade-cookies-on-plate.jpeg")  # Adjust image path
+        pixmap = pixmap.scaledToWidth(100)
+        image_label.setPixmap(pixmap)
+        main_layout.addWidget(image_label)
 
-        # Error icon
-        error_icon_label = QLabel()
-        error_pixmap = QPixmap("images/failed.png")  # Replace with your icon path
-        error_icon_label.setPixmap(error_pixmap.scaled(24, 24, Qt.AspectRatioMode.KeepAspectRatio))
-        error_icon_label.setMaximumSize(30, 30)
-        icon_message_layout.addWidget(error_icon_label)
+        # File info layout
+        info_layout = QVBoxLayout()
+        
+        # File name
+        file_name_label = QLabel("File Name: free-photo-of-stack-of-delicious-homemade-cookies-on-plate.jpeg")
+        info_layout.addWidget(file_name_label)
+        
+        # Status
+        status_label = QLabel("Status: Completed")
+        info_layout.addWidget(status_label)
+        
+        # Total size
+        size_label = QLabel("Total size: 19.6 KB")
+        info_layout.addWidget(size_label)
+        
+        # Added at
+        added_at_label = QLabel("Added at: 1:53 AM")
+        info_layout.addWidget(added_at_label)
+        
+        # File path
+        path_label = QLabel("Path: C:\\Users\\bonface\\Downloads")
+        info_layout.addWidget(path_label)
 
-        # Error message
-        message_layout = QVBoxLayout()
-        error_label = QLabel("File Not Found")
-        error_label.setStyleSheet("font-weight: bold; font-size: 16px; color: #E74C3C;")
-        details_label = QLabel(f"The file '{self.file_name}' could not be found or may have been moved.")
-        details_label.setWordWrap(True)
-        message_layout.addWidget(error_label)
-        message_layout.addWidget(details_label)
-        icon_message_layout.addLayout(message_layout)
+        # Add info layout to the main layout
+        main_layout.addLayout(info_layout)
 
-        main_layout.addLayout(icon_message_layout)
+        # File link
+        link_label = QLabel('<a href="https://images.pexels.com/...=tinysrgb&w=600&lazy=load">File Link</a>')
+        link_label.setOpenExternalLinks(True)
+        main_layout.addWidget(link_label)
 
-        # Buttons
-        button_layout = QHBoxLayout()
-        ok_button = QPushButton(QIcon('images/like.png')," OK")
-        ok_button.clicked.connect(self.accept)
-        button_layout.addStretch()
-        button_layout.addWidget(ok_button)
-
-        main_layout.addStretch()
-        main_layout.addLayout(button_layout)
-
+        # Set main layout
         self.setLayout(main_layout)
+        self.setMinimumWidth(300)
 
-        self.setStyleSheet("""
-            FileNotFoundDialog{
-                background-color: #e2e7eb;
-            }
-            QPushButton{
-                background-color: #48D1CC;
-                width: 100px;
-                height: 30px;
-                border-radius: 5px;
-                margin: 5px 5px 0  0;
-            }
 
-        """)
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     app = QApplication(sys.argv)
-    dialog = FileNotFoundDialog("Free 4K Stock Videos & Full HD Video Clips to Download.mp4")
-    dialog.exec()
+    window = FileInfoApp()
+    window.show()
+    sys.exit(app.exec())
