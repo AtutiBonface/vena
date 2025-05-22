@@ -12,6 +12,7 @@ class ThemeColors:
             'text': '#24292e',
             'text_secondary': '#656d76',
             'border': '#e1e4e8',
+            'separator': '#f0f2f4',  # Add lighter border color for separators
             'content_border': '#ccc',  # Add specific border color for content container
             'hover': '#e1e4e8',
             'button': '#f1f2f3',
@@ -19,10 +20,10 @@ class ThemeColors:
             'accent': '#48D1CC',
             'accent_hover': '#3eb5b0',  # Slightly darker version of accent
             'status': {
-                'completed': '#2da44e',
-                'downloading': '#48D1CC',
-                'paused': '#bf8700',
-                'failed': '#cf222e'
+                'completed': '#4ac069',  # Lighter green
+                'downloading': '#70d6d1', # Lighter turquoise
+                'paused': '#dba53f',     # Lighter orange
+                'failed': '#e65d66'      # Lighter red
             }
         }
         
@@ -41,10 +42,10 @@ class ThemeColors:
             'accent': '#48D1CC',
             'accent_hover': '#5ce6e0',  # Slightly lighter version of accent
             'status': {
-                'completed': '#238636', 
-                'downloading': '#48D1CC',
-                'paused': '#9e6a03',
-                'failed': '#a40e26'
+                'completed': '#3da158',  # Lighter green for dark theme
+                'downloading': '#5eccc7', # Lighter turquoise for dark theme
+                'paused': '#c99537',     # Lighter orange for dark theme
+                'failed': '#d34751'      # Lighter red for dark theme
             }
         }
 
@@ -171,12 +172,22 @@ class ThemeColors:
             FileItemWidget {{
                 background-color: transparent;
                 border-radius: 4px;
-                margin: 2px 8px;
+                margin: 0;
                 padding: 2px;
+                border-bottom: 1px solid {colors.get('separator', colors['border'])};  /* Lighter separator for light theme */
+            }}
+            
+            FileItemWidget:last-child {{
+                border-bottom: none;  /* Remove border from last item */
             }}
             
             FileItemWidget:hover {{
                 background-color: {colors['button']};
+            }}
+            
+            /* Add padding to the main layout of FileItemWidget */
+            FileItemWidget > QHBoxLayout {{
+                padding: 8px 12px;
             }}
             
             FileItemWidget:checked {{
@@ -196,12 +207,13 @@ class ThemeColors:
                 color: {colors['text']};
                 font-size: 13px;
                 font-weight: 500;
-                text-align: left;
-                padding-right: 8px;
+                padding: 2px 0;
             }}
+            
             FileItemWidget #info-label {{
                 color: {colors['text_secondary']};
                 font-size: 12px;
+                padding: 2px 0;
             }}
             
             /* Status label styles */
@@ -245,11 +257,15 @@ class ThemeColors:
             FileItemWidget #speed-label {{
                 color: {colors['text']};
                 font-size: 12px;
+                padding: 2px 0;
             }}
+            
             FileItemWidget #date-label {{
                 color: {colors['text_secondary']};
                 font-size: 12px;
+                padding: 2px 0;
             }}
+            
             FileItemWidget #retry-btn {{
                 background: transparent;
                 color: {colors['accent']};

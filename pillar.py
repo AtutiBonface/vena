@@ -186,8 +186,21 @@ class MainApplication(QMainWindow):
 
     def do_action(self, text):
         """Handle actions for file operations"""
-        if self.details_of_file_clicked:
-            f_name, path = self.details_of_file_clicked
+        selected_files = []
+        # Check active file widgets
+        for filename, widget in self.active_file_widgets.items():
+            if widget.checkbox.isChecked():
+                selected_files.append((filename, widget.file_path))
+        # Check complete file widgets        
+        for filename, widget in self.complete_file_widgets.items():
+            if widget.checkbox.isChecked():
+                selected_files.append((filename, widget.file_path))
+
+        # If no files are selected but a file is clicked, use that
+        if not selected_files and self.details_of_file_clicked:
+            selected_files = [self.details_of_file_clicked]
+
+        for f_name, path in selected_files:
             path_and_file = os.path.join(path, f_name)
             
             if text == 'Open':
@@ -204,16 +217,10 @@ class MainApplication(QMainWindow):
             elif text == 'Delete':
                 self.confirm = DeletionConfirmationWindow(self, f_name, path_and_file)
                 self.confirm.show()
-                    
-            elif text == 'Pause':
-                self.pause_downloading_file(path_and_file)
-                
-            elif text == 'Resume':
-                self.resume_paused_file(path_and_file)
-                
-            elif text == 'Restart':
-                # Add restart functionality here if needed
-                pass
+
+        # Clear checkboxes after action
+        for widget in list(self.active_file_widgets.values()) + list(self.complete_file_widgets.values()):
+            widget.checkbox.setChecked(False)
 
     # Sidebar related methods
     def create_sidebar(self):       
@@ -284,7 +291,8 @@ class MainApplication(QMainWindow):
                             
                             # Create the top window only once
                             self.add_link_top_window = AddLink(app=self,cache=cookies, url=url, filename=filename, task_manager=self.task_manager)                               
-                            self.add_link_top_window.show()                  
+                            self.add_link_top_window.show()   
+                            print('No but cant open')               
   
                 else:
                     print("No message")
@@ -817,30 +825,35 @@ class FileItemWidget(QFrame):
         info_section = QVBoxLayout()
         info_section.setSpacing(4)
         
-        # Filename row
-        self.filename_label = QLabel()
+        # Filename row with fixed height and clear styling
+        filename_container = QHBoxLayout()
+        self.filename_label = QLabel(filename)
         self.filename_label.setObjectName('filename-label')
         metrics = QFontMetrics(self.filename_label.font())
         elided_filename = metrics.elidedText(filename, Qt.TextElideMode.ElideMiddle, 380)
         self.filename_label.setText(elided_filename)
-        self.filename_label.setToolTip(filename)  # Show full name on hover
-        info_section.addWidget(self.filename_label)
+        self.filename_label.setToolTip(filename)
+        self.filename_label.setFixedHeight(20)  # Ensure consistent height
+        filename_container.addWidget(self.filename_label)
+        filename_container.addStretch()
+        info_section.addLayout(filename_container)
 
-        # Status row
+        # Status row with fixed layout and sizing
         status_layout = QHBoxLayout()
         status_layout.setSpacing(12)
         
-        # Progress info
+        # Progress info with fixed width
+        self.download_info = QLabel()
+        self.download_info.setObjectName('info-label')
+        self.download_info.setFixedWidth(200)
         progress_text = f"{downloaded} of {file_size}"
         if '---' in downloaded or '---' in file_size:
             progress_text = "Waiting..."
+        self.download_info.setText(progress_text)
         
-        self.download_info = QLabel(progress_text)
-        self.download_info.setObjectName('info-label')
-        
-        # Status label with progress
+        # Status label with fixed width
         status_text = status
-        status_type = 'downloading'  # default status
+        status_type = 'downloading'
         if 'failed' in status.lower():
             status_text = "Failed"
             status_type = 'failed'
@@ -853,13 +866,17 @@ class FileItemWidget(QFrame):
         
         self.download_status = QLabel(status_text)
         self.download_status.setObjectName('status-label')
-        self.download_status.setProperty('download-status', status_type)  # Changed property name
-        self.download_status.style().polish(self.download_status)
+        self.download_status.setProperty('download-status', status_type)
+        self.download_status.setFixedWidth(100)
+        self.download_status.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
-        # Speed label
+        # Speed label with fixed width
         self.download_speed = QLabel(speed if speed and speed.strip() not in ['0', '', '---'] else '')
         self.download_speed.setObjectName('speed-label')
+        self.download_speed.setFixedWidth(100)
+        self.download_speed.setAlignment(Qt.AlignmentFlag.AlignRight)
         
+        # Add widgets to status layout
         status_layout.addWidget(self.download_info)
         status_layout.addWidget(self.download_status)
         status_layout.addWidget(self.download_speed)
@@ -873,29 +890,17 @@ class FileItemWidget(QFrame):
         status_layout.addStretch()
         info_section.addLayout(status_layout)
         
+        # Add info section to main layout
         main_layout.addLayout(info_section, 1)
 
-        # Right section - Date
+        # Right section - Date with fixed width
         self.modified_label = QLabel(modified_date)
         self.modified_label.setObjectName('date-label')
+        self.modified_label.setFixedWidth(150)
         main_layout.addWidget(self.modified_label)
 
         self.setLayout(main_layout)
         self.apply_fonts()
-        self.setup_styles()
-
-        # Update status label with proper status and color
-        status_type = 'downloading'
-        if 'finished' in status.lower():
-            status_type = 'completed'
-        elif 'failed' in status.lower():
-            status_type = 'failed'
-        elif 'paused' in status.lower():
-            status_type = 'paused'
-            
-        self.download_status.setProperty('download-status', status_type)
-        self.download_status.style().unpolish(self.download_status)
-        self.download_status.style().polish(self.download_status)
 
     def setup_styles(self):
         # Remove hardcoded styles since they're now handled by theme system

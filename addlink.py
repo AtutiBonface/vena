@@ -68,6 +68,8 @@ class AddLink(QWidget):
         self.theme_manager = ThemeColors()
         self.current_theme = storage.get_setting('THEME') or 'system'
         self.other_methods = OtherMethods()
+        self.url = url
+        self.init_filename = filename
 
         self.selected_path = None
         self.setWindowFlags(
@@ -177,10 +179,18 @@ class AddLink(QWidget):
             frame.setLayout(layout_h)
             layout.addWidget(frame)
 
+        # After creating the entries, set their values if provided
+        if self.url:
+            self.address_entry.setText(self.url)
+        if self.init_filename:
+            self.filename_entry.setText(self.init_filename)
+            
         # Connect address entry signal
         self.address_entry.textChanged.connect(self.getInputValue)
         self.savein_entry.setDisabled(True)
         self.savein_entry.setText(self.download_path)
+
+        
 
         # Button frame 
         button_frame = QFrame()

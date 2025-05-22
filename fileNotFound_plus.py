@@ -84,7 +84,7 @@ class DeletionConfirmationWindow(QDialog):
         main_layout = QVBoxLayout()
 
         # Warning message
-        warning_label = QLabel(f"Are you sure you want to delete '{self.file_name}'?")
+        warning_label = QLabel(f"Delete '{self.file_name}'?")
         warning_label.setWordWrap(True)
         warning_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         warning_label.setStyleSheet("font-weight: bold; color: #E74C3C;")
