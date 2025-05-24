@@ -17,6 +17,7 @@ from aboutPage import AboutWindow
 from fileNotFound_plus import DeletionConfirmationWindow, FileNotFoundDialog
 from settings import AppSettings
 from themes import ThemeColors
+from fileInfoBox import FileInfoBox
 
 
 class MainApplication(QMainWindow):
@@ -200,10 +201,15 @@ class MainApplication(QMainWindow):
         if not selected_files and self.details_of_file_clicked:
             selected_files = [self.details_of_file_clicked]
 
-        for f_name, path in selected_files:
-            path_and_file = os.path.join(path, f_name)
+        if text == 'Open':
+            # Only allow opening one file at a time
+            if len(selected_files) > 1:
+                # Could show a message that only one file can be opened at a time
+                return
             
-            if text == 'Open':
+            if selected_files:
+                f_name, path = selected_files[0]
+                path_and_file = os.path.join(path, f_name)
                 if not os.path.exists(path_and_file):
                     self.file_not_found_popup = FileNotFoundDialog(self, f_name)
                     self.file_not_found_popup.show()
@@ -214,8 +220,23 @@ class MainApplication(QMainWindow):
                     elif system_name == 'Linux':
                         subprocess.Popen(["xdg-open", path_and_file])
                         
-            elif text == 'Delete':
-                self.confirm = DeletionConfirmationWindow(self, f_name, path_and_file)
+        elif text == 'Delete':
+            if selected_files:
+                # Show single confirmation dialog for all selected files
+                if len(selected_files) == 1:
+                    f_name, path = selected_files[0]
+                    path_and_file = os.path.join(path, f_name)
+                    self.confirm = DeletionConfirmationWindow(self, f_name, path_and_file)
+                else:
+                    # For multiple files, show first file name and count
+                    first_file = selected_files[0][0]
+                    others_count = len(selected_files) - 1
+                    display_name = f"{first_file} and {others_count} other{'s' if others_count > 1 else ''}"
+                    self.confirm = DeletionConfirmationWindow(
+                        self, 
+                        display_name, 
+                        [os.path.join(path, fname) for fname, path in selected_files]
+                    )
                 self.confirm.show()
 
         # Clear checkboxes after action
@@ -554,38 +575,43 @@ class TopBar(QFrame):
         
         actions_layout = QHBoxLayout()
         actions_layout.setContentsMargins(8, 0, 8, 0)
+        actions_layout.setSpacing(8)  # Add consistent spacing
 
-        # Add link button with spacing
-        add_link_btn = QPushButton(QIcon(self.other_methods.resource_path('images/link-outline.png')), "Add Link")
-        add_link_btn.setObjectName('add-link-btn')
-        add_link_btn.setIconSize(QSize(14, 14))
-        add_link_btn.clicked.connect(self.open_link_box)
-        add_link_btn.setFixedHeight(35)
-        
-        # Action buttons with proper spacing
-        open_btn = QPushButton(QIcon(self.other_methods.resource_path('images/open-filled.png')), "Open")
-        delete_btn = QPushButton(QIcon(self.other_methods.resource_path('images/trash-bin-filled.png')), "Delete")
-        pause_btn = QPushButton(QIcon(self.other_methods.resource_path('images/pause-filled.png')), "Pause")
-        resume_btn = QPushButton(QIcon(self.other_methods.resource_path('images/play-button-filled.png')), "Resume")
-        restart_btn = QPushButton(QIcon(self.other_methods.resource_path('images/refresh-filled.png')), "Restart")
+        # Add select all checkbox with proper sizing
+        self.select_all = QCheckBox("Select All")
+        self.select_all.setObjectName('select-all')
+        self.select_all.setFixedHeight(35)  # Match button height
+        self.select_all.stateChanged.connect(self.toggle_all_files)
+        actions_layout.addWidget(self.select_all)
 
-        # Set fixed height and style for all buttons
+        # Create icon-only buttons
+        add_link_btn = QPushButton(QIcon(self.other_methods.resource_path('images/link-outline.png')), "")
+        open_btn = QPushButton(QIcon(self.other_methods.resource_path('images/open-filled.png')), "")
+        delete_btn = QPushButton(QIcon(self.other_methods.resource_path('images/trash-bin-filled.png')), "")
+        pause_btn = QPushButton(QIcon(self.other_methods.resource_path('images/pause-filled.png')), "")
+        resume_btn = QPushButton(QIcon(self.other_methods.resource_path('images/play-button-filled.png')), "")
+        restart_btn = QPushButton(QIcon(self.other_methods.resource_path('images/refresh-filled.png')), "")
+
+        # Add tooltips
+        add_link_btn.setToolTip("Add Link")
+        open_btn.setToolTip("Open")
+        delete_btn.setToolTip("Delete")
+        pause_btn.setToolTip("Pause")
+        resume_btn.setToolTip("Resume")
+        restart_btn.setToolTip("Restart")
+
+        # Set fixed size and properties for all buttons
         for btn in [add_link_btn, open_btn, delete_btn, pause_btn, resume_btn, restart_btn]:
-            btn.setFixedHeight(35)
-            btn.setIconSize(QSize(14, 14))  # Smaller icon size
-            btn.setStyleSheet("""
-                QPushButton {
-                    text-align: center;
-                    padding-left: 8px;
-                }
-                QPushButton QIcon {
-                    margin-right: 4px;
-                }
-            """)
+            btn.setFixedSize(35, 35)  # Make buttons square
+            btn.setIconSize(QSize(16, 16))  # Adjust icon size
+            btn.setMinimumWidth(35)  # Enforce minimum width
+            btn.setMaximumWidth(35)  # Enforce maximum width
+
+        # Set object names for styling
+        add_link_btn.setObjectName('add-link-btn')
 
         # Add buttons to layout
         actions_layout.addWidget(add_link_btn)
-        actions_layout.addStretch()
         actions_layout.addWidget(open_btn)
         actions_layout.addWidget(delete_btn)
         actions_layout.addWidget(pause_btn)
@@ -593,6 +619,7 @@ class TopBar(QFrame):
         actions_layout.addWidget(restart_btn)
 
         # Connect action buttons
+        add_link_btn.clicked.connect(self.open_link_box)
         open_btn.clicked.connect(lambda: self.app.do_action('Open'))
         delete_btn.clicked.connect(lambda: self.app.do_action('Delete'))
         pause_btn.clicked.connect(lambda: self.app.do_action('Pause'))
@@ -605,6 +632,11 @@ class TopBar(QFrame):
     def open_link_box(self):       
         self.app.add_link_top_window = AddLink(app=self.app, task_manager=self.task_manager)
         self.app.add_link_top_window.show()
+
+    def toggle_all_files(self, state):
+        # Toggle all checkboxes in active and complete file widgets
+        for widget in list(self.app.active_file_widgets.values()) + list(self.app.complete_file_widgets.values()):
+            widget.checkbox.setChecked(state == Qt.CheckState.Checked.value)
 
 class ContentArea(QFrame):
     def __init__(self):
@@ -809,13 +841,17 @@ class FileItemWidget(QFrame):
         left_section.setSpacing(10)  # Adjust spacing between checkbox and icon
         
         self.checkbox = QCheckBox()
-        self.checkbox.setFixedSize(18, 18)  # Keep the size but remove custom styling
+        self.checkbox.setObjectName('file-checkbox')
+        self.checkbox.stateChanged.connect(self.on_checkbox_changed)
         
         self.icon_label = QLabel()
         self.icon_label.setObjectName('icon-label')
         self.icon_label.setFixedSize(32, 32)
         self.icon_label.setPixmap(QIcon(self.other_methods.resource_path(self.image)).pixmap(20, 20))
         self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # Make icon clickable and show pointer cursor
+        self.icon_label.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.icon_label.mousePressEvent = self.icon_clicked
         
         left_section.addWidget(self.checkbox)
         left_section.addWidget(self.icon_label)
@@ -951,7 +987,8 @@ class FileItemWidget(QFrame):
             self.download_speed.setText(f"")
         else:
             if not '---' in percentage:
-                self.download_status.setText(f"{status} {percentage}")
+                #self.download_status.setText(f"{status} {percentage}")
+                self.download_status.setText(f"{percentage}")
             else:
                 self.download_status.setText(f"{status}")
         # Update download speed
@@ -992,65 +1029,23 @@ class FileItemWidget(QFrame):
         self.filename_label.setText(elided_filename)
         self.filename_label.setToolTip(new_name)
 
+    def on_checkbox_changed(self, state):
+        self.setProperty('isChecked', state == Qt.CheckState.Checked.value)
+        self.style().unpolish(self)
+        self.style().polish(self)
 
-class FileInfoBox(QFrame):
-    def __init__(self):
-        super().__init__()
-        self.init_ui()
-        self.setObjectName('file-info-box')
-        # Remove background color from stylesheet since it's handled by theme system
-        self.setStyleSheet("""
-            QLabel {
-                padding: 10px 0;
-                margin: 0;
-            }
-            #link {
-                color: #48D1CC;
-            }
-        """)
-
-    def init_ui(self):
-        self.main_layout = QVBoxLayout()
-        self.main_layout.addStretch()
-        self.image_label = QLabel()
-        
-        self.main_layout.addWidget(self.image_label)
-        info_layout = QVBoxLayout()        
-        # File name
-        self.file_name_label = QLabel("")
-        info_layout.addWidget(self.file_name_label)        
-        # Status
-        self.status_label = QLabel("")
-        info_layout.addWidget(self.status_label)        
-        # Total size
-        self.size_label = QLabel("")
-        info_layout.addWidget(self.size_label)        
-        # Added at
-        self.added_at_label = QLabel("")
-        info_layout.addWidget(self.added_at_label)        
-        # File path
-        self.path_label = QLabel("")
-        info_layout.addWidget(self.path_label)
-        # Add info layout to the main layout
-        # File link
-        self.link_label = QLabel('')
-        self.link_label.setObjectName('link')
-        self.link_label.setWordWrap(True) 
-        info_layout.addWidget(self.link_label)
-
-
-        
-        self.link_label.setOpenExternalLinks(True)
-        self.main_layout.addLayout(info_layout)
-        self.main_layout.addStretch()
-       
-
-
-
-        # Set main layout
-        self.setLayout(self.main_layout)
-        self.setMinimumWidth(200)
-        self.setMaximumWidth(300)
+    def icon_clicked(self, event):
+        """Handle icon click to open file"""
+        path_and_file = os.path.join(self.file_path, self.filename)
+        if not os.path.exists(path_and_file):
+            self.app.file_not_found_popup = FileNotFoundDialog(self.app, self.filename)
+            self.app.file_not_found_popup.show()
+        else:
+            system_name = platform.system()
+            if system_name == 'Windows':
+                os.startfile(path_and_file)
+            elif system_name == 'Linux':
+                subprocess.Popen(["xdg-open", path_and_file])
 
 
 

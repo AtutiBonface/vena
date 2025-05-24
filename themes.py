@@ -17,8 +17,8 @@ class ThemeColors:
             'hover': '#e1e4e8',
             'button': '#f1f2f3',
             'button_text': '#24292e',
-            'accent': '#48D1CC',
-            'accent_hover': '#3eb5b0',  # Slightly darker version of accent
+            'accent': '#6a3de8',
+            'accent_hover': '#5934c4',  # Darker version of accent
             'status': {
                 'completed': '#4ac069',  # Lighter green
                 'downloading': '#70d6d1', # Lighter turquoise
@@ -39,8 +39,8 @@ class ThemeColors:
             'hover': '#2d2d2d',
             'button': '#333333',
             'button_text': '#e1e1e1',
-            'accent': '#48D1CC',
-            'accent_hover': '#5ce6e0',  # Slightly lighter version of accent
+            'accent': '#6a3de8',
+            'accent_hover': '#7b52f5',  # Slightly lighter for dark theme
             'status': {
                 'completed': '#3da158',  # Lighter green for dark theme
                 'downloading': '#5eccc7', # Lighter turquoise for dark theme
@@ -130,7 +130,7 @@ class ThemeColors:
             }}
             #topbar {{
                 background-color: transparent;
-                border-bottom: 1px solid {colors['border']};
+                border-bottom: 1px solid {colors.get('separator', colors['border'])};
                 padding: 8px;
             }}
             #file-info-box {{
@@ -174,11 +174,11 @@ class ThemeColors:
                 border-radius: 4px;
                 margin: 0;
                 padding: 2px;
-                border-bottom: 1px solid {colors.get('separator', colors['border'])};  /* Lighter separator for light theme */
+                border-bottom: 1px solid {colors.get('separator', colors['border'])};
             }}
             
-            FileItemWidget:last-child {{
-                border-bottom: none;  /* Remove border from last item */
+            FileItemWidget[isChecked="true"] {{
+                background-color: {colors['button']};
             }}
             
             FileItemWidget:hover {{
@@ -194,9 +194,27 @@ class ThemeColors:
                 background-color: {colors['button']};
             }}
             
-            FileItemWidget #file-checkbox {{
-                margin: 0;
-                spacing: 0;
+            /* Replace FileItemWidget checkbox styles with topbar checkbox styles */
+            FileItemWidget QCheckBox {{
+                margin-right: 8px;
+            }}
+
+            FileItemWidget QCheckBox::indicator {{
+                width: 16px;
+                height: 16px;
+                border-radius: 4px;
+                border: 2px solid {colors['border']};
+                background: {colors['content_container']};
+            }}
+
+            FileItemWidget QCheckBox::indicator:checked {{
+                background: {colors['accent']};
+                border-color: {colors['accent']};
+                image: url(images/check-white.png);
+            }}
+
+            FileItemWidget QCheckBox::indicator:hover {{
+                border-color: {colors['accent']};
             }}
             
             FileItemWidget #icon-label {{
@@ -286,32 +304,60 @@ class ThemeColors:
                 background-color: {colors['button']};
                 color: {colors['button_text']};
                 border: none;
-                border-radius: 4px;
-                padding: 6px 12px;
+                border-radius: 6px;
+                width: 35px !important;
+                height: 35px !important;
+                min-width: 35px;
+                max-width: 35px;
+                padding: 0;
                 margin-right: 8px;
             }}
-            
+
+            #topbar #add-link-btn {{
+                background-color: {colors['accent']};
+                margin-left: 10px;
+                margin-right: 8px;
+            }}
+
             #topbar QPushButton:hover {{
                 background-color: {colors['hover']};
             }}
 
-            #topbar QIcon {{
-                margin-right: 6px;
-            }}
-            
-            #topbar #add-link-btn {{
-                background-color: {colors['accent']};
-                color: white;
-            }}
-            
             #topbar #add-link-btn:hover {{
                 background-color: {colors['accent_hover']};
+            }}
+
+            /* Select All Checkbox Style */
+            #select-all {{
+                margin-right: 10px;  
+                color: {colors['text']};
+                font-size: 13px;
+                font-weight: 500;
+            }}
+
+            #select-all::indicator {{
+                width: 16px;
+                height: 16px;
+                border-radius: 4px;
+                border: 2px solid {colors['border']};
+                background: {colors['content_container']};
+            }}
+
+            #select-all::indicator:checked {{
+                background: {colors['accent']};
+                border-color: {colors['accent']};
+                image: url(images/check-white.png);
+            }}
+
+            #select-all::indicator:hover {{
+                border-color: {colors['accent']};
             }}
             
             /* About Page Styles */
             #scroll-content {{
                 background-color: {colors['content_area']};
                 border-radius: 10px;
+               
             }}
             
             #scroll-area {{
@@ -445,7 +491,30 @@ class ThemeColors:
                 color: {colors['text']};
                 padding: 8px 0;
             }}
-            
+
+            /* Add settings page checkbox styling */
+            .settings-page QCheckBox {{
+                margin-right: 8px;
+            }}
+
+            .settings-page QCheckBox::indicator {{
+                width: 16px;
+                height: 16px;
+                border-radius: 4px;
+                border: 2px solid {colors['border']};
+                background: {colors['content_container']};
+            }}
+
+            .settings-page QCheckBox::indicator:checked {{
+                background: {colors['accent']};
+                border-color: {colors['accent']};
+                image: url(images/check-white.png);
+            }}
+
+            .settings-page QCheckBox::indicator:hover {{
+                border-color: {colors['accent']};
+            }}
+
             .settings-page QLineEdit,
             .settings-page QComboBox,
             .settings-page QSpinBox {{
@@ -733,5 +802,69 @@ class ThemeColors:
 
             #sidebar #network-status:hover {{
                 background-color: {colors['hover']};
+            }}
+
+            /* Spinbox and Slider Styles */
+            QSpinBox {{
+                background-color: {colors['content_container']};
+                color: {colors['text']};
+                border: 1px solid {colors['border']};
+                border-radius: 4px;
+                padding: 4px 8px;
+                min-width: 80px;
+            }}
+
+            QSpinBox::up-button, QSpinBox::down-button {{
+                width: 20px;
+                background-color: {colors['button']};
+                border: none;
+                border-radius: 2px;
+                margin: 2px;
+            }}
+
+            QSpinBox::up-button:hover, QSpinBox::down-button:hover {{
+                background-color: {colors['hover']};
+            }}
+
+            QSpinBox::up-arrow {{
+                image: url(images/up-arrow.png);
+                width: 10px;
+                height: 10px;
+            }}
+
+            QSpinBox::down-arrow {{
+                image: url(images/down-arrow.png);
+                width: 10px;
+                height: 10px;
+            }}
+
+            QSlider::groove:horizontal {{
+                border: none;
+                height: 6px;
+                background: {colors['button']};
+                border-radius: 3px;
+            }}
+
+            QSlider::handle:horizontal {{
+                background: {colors['accent']};
+                border: none;
+                width: 16px;
+                height: 16px;
+                margin: -5px 0;
+                border-radius: 8px;
+            }}
+
+            QSlider::handle:horizontal:hover {{
+                background: {colors['accent_hover']};
+            }}
+
+            QSlider::add-page:horizontal {{
+                background: {colors['button']};
+                border-radius: 3px;
+            }}
+
+            QSlider::sub-page:horizontal {{
+                background: {colors['accent']};
+                border-radius: 3px;
             }}
         """
