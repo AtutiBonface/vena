@@ -969,7 +969,7 @@ class FileItemWidget(QFrame):
         downloaded = other_methods.return_filesize_in_correct_units(downloaded)
         self.filename_label.setText(filename)
         # Update file size and downloaded information
-        self.download_info.setText(f"[ {downloaded} / {file_size} ]")
+        self.download_info.setText(f" {downloaded} of {file_size} ")
         # Update download status
         if 'finished' in status.lower():
             self.download_status.setText(f"{status} ")
