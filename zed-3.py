@@ -50,7 +50,7 @@ class MainApplication(QMainWindow):
 
     def setup_window(self):
         self.setWindowTitle('VenaApp')
-        self.setWindowIcon(QIcon(self.other_methods.resource_path('images/main.ico')))
+        self.setWindowIcon(QIcon(self.other_methods.resource_path('images/tray.ico')))
         self.setGeometry(100, 100, 800, 540)
         self.center_window()
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
@@ -1104,7 +1104,7 @@ class CustomTitleBar(QFrame):
         
         # Window icon
         self.window_icon = QLabel()
-        self.window_icon.setPixmap(QIcon(self.other_methods.resource_path('images/main.ico')).pixmap(24, 24))
+        self.window_icon.setPixmap(QIcon(self.other_methods.resource_path('images/tray.ico')).pixmap(24, 24))
         self.window_icon.setStyleSheet("background-color: transparent; margin: 0 15px;")
 
 

@@ -26,7 +26,7 @@ class DownloadIndicator(QWidget):
                             
         )
         self.setWindowTitle("Downloads Status")
-        self.setWindowIcon(QIcon(self.other_methods.resource_path('images/main.ico')))
+        self.setWindowIcon(QIcon(self.other_methods.resource_path('images/tray.ico')))
         self.setFixedSize(300, 160)
         self.move_to_bottom_right()
 

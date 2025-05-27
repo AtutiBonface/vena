@@ -30,7 +30,7 @@ class AboutWindow(QFrame):
         # App Logo (placeholder)
         logo_label = QLabel()
 
-        logo_pixmap = QPixmap('images/main.ico')  # Create a placeholder pixmap
+        logo_pixmap = QPixmap('images/tray.ico')  # Create a placeholder pixmap
         logo_pixmap = logo_pixmap.scaled(30, 30)  # Make it transparent
         logo_label.setPixmap(logo_pixmap)
         logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)

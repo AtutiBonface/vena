@@ -35,7 +35,7 @@ class Images():
         self.video = self.resource_path('images/vlc.png')
         self.image = self.resource_path('images/camera-icon.png')
 
-        self.logo = self.resource_path('images/main.ico')
+        self.logo = self.resource_path('images/tray.ico')
 
 
 class DownloadingIndicatorBox():

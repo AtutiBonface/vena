@@ -21,7 +21,7 @@ if sys.platform == 'win32':
     base = 'Win32GUI'  # Use 'Console' if you want a console window
 
 # Icon file for the executable
-icon_path = os.path.join('images', 'main.ico')
+icon_path = os.path.join('images', 'tray.ico')
 
 executables = [
     Executable(

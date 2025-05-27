@@ -36,7 +36,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['images\\main.ico'],
+    icon=['images\\tray.ico'],
 )
 
 # Collect step to gather all files into a directory

@@ -55,7 +55,7 @@ class AddLink(QWidget):
     def __init__(self, app= None, url=None ,filename=None,cache = None, task_manager=None):
         super().__init__()
         self.setWindowTitle("Download file")
-        self.setWindowIcon(QIcon('images/main.ico'))
+        self.setWindowIcon(QIcon('images/tray.ico'))
         self.setGeometry(150, 150, 500, 280)  # Made window wider
         self.setFixedSize(500, 280)  # Prevent window resizing
         self.center_window()

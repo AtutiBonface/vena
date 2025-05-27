@@ -50,7 +50,7 @@ class MainApplication(QMainWindow):
 
     def setup_window(self):
         self.setWindowTitle('VenaApp')
-        self.setWindowIcon(QIcon(self.other_methods.resource_path('images/main.ico')))
+        self.setWindowIcon(QIcon(self.other_methods.resource_path('images/tray.ico')))
         self.setGeometry(100, 100, 1000, 640)
         self.center_window()
         self.setStyleSheet("""

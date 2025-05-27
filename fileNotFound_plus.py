@@ -17,7 +17,7 @@ class FileNotFoundDialog(QDialog):
 
     def init_ui(self):
         self.setWindowTitle("File Not Found")
-        self.setWindowIcon(QIcon(self.app.other_methods.resource_path('images/main.ico')))
+        self.setWindowIcon(QIcon(self.app.other_methods.resource_path('images/tray.ico')))
         self.setFixedSize(400, 180)
         
         # Center dialog on screen
@@ -109,7 +109,7 @@ class DeletionConfirmationWindow(QDialog):
 
     def init_ui(self):
         self.setWindowTitle("Confirm Deletion")
-        self.setWindowIcon(QIcon(self.app.other_methods.resource_path('images/main.ico')))
+        self.setWindowIcon(QIcon(self.app.other_methods.resource_path('images/tray.ico')))
         self.setFixedSize(400, 180)
         
         # Center dialog on screen
